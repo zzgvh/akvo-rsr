@@ -592,7 +592,7 @@ class ProjectAdmin(admin.ModelAdmin):
 
 admin.site.register(get_model('rsr', 'project'), ProjectAdmin)
 
-
+    
 class UserProfileAdminForm(forms.ModelForm):
     """
     This form dispalys two extra fields that show if the ser belongs to the groups
@@ -617,10 +617,16 @@ class UserProfileAdminForm(forms.ModelForm):
             kwargs.update({'initial': initial_data})
         super(UserProfileAdminForm, self).__init__(*args, **kwargs)
 
+class SmsReportingInline(admin.TabularInline):
+    model = get_model('rsr', 'smsreporting')
+    extra = 1
+    
 class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
     list_display = ('user_name', 'organisation', 'get_is_active', 'get_is_org_admin', 'get_is_org_editor',)
     list_filter  = ('organisation', )
     form = UserProfileAdminForm
+    inlines = [SmsReportingInline,]
+
 
     #Methods overridden from ModelAdmin (django/contrib/admin/options.py)
     def get_form(self, request, obj=None, **kwargs):

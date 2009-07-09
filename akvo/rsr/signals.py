@@ -12,6 +12,18 @@ from django.db.models import get_model, ImageField
 
 from sorl.thumbnail.fields import ImageWithThumbnailsField
 
+def create_update_from_sms(sender, **kwargs):
+    """
+    called when an sms callback is made to try and create a project update
+    """
+    #from dbgp.client import brk
+    #brk(host="localhost", port=9000)            
+    if kwargs.get('created', False):
+        new_sms = kwargs['instance']
+        u = get_model('rsr', 'UserProfile').objects.get_sms_sender(new_sms)
+        if u:
+            u.create_sms_update(new_sms)
+
 def create_publishing_status(sender, **kwargs):
     """
     called when a new project is saved so an associated published record for the
