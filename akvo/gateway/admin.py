@@ -1,0 +1,35 @@
+# -*- coding: utf-8 -*-
+
+# Akvo RSR is covered by the GNU Affero General Public License.
+# See more details in the license.txt file located at the root folder of the Akvo RSR module. 
+# For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
+
+from django.contrib import admin
+from django.db.models import get_model
+
+
+#class GatewayCallbackApiFieldInLine(admin.TabularInline):
+#    model   = get_model('gateway', 'gatewaycallbackapifield')
+#    #don't work...initial = [{'name': 'sender'}, {'name': 'receiver'}, {'name': 'message'}, {'name': 'getaway_timestamp'}, {'name': 'gateway_id'}, ]
+#    extra = 5
+#    max_num = 5
+
+class GatewayNumberInLine(admin.TabularInline):
+    model = get_model('gateway', 'gatewaynumber')
+    extra = 3
+
+class GatewayAdmin(admin.ModelAdmin):
+    model = get_model('gateway', 'gateway')
+    list_display = ('name', 'host_name', 'send_path', 'numbers', )
+    inlines = [GatewayNumberInLine, ]
+    
+admin.site.register(get_model('gateway', 'gateway'), GatewayAdmin)
+
+
+class MoSmsAdmin(admin.ModelAdmin):
+    pass
+
+admin.site.register(get_model('gateway', 'mosms'), MoSmsAdmin)
+
+
+
