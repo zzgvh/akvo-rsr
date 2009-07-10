@@ -129,7 +129,7 @@ urlpatterns = patterns('',
     #    'django.views.static.serve', 
     #    {'document_root': '/var/dev/akvo/mediaroot/', 'show_indexes': True}),
     
-    (r'^gateway/', include('akvo.gateway.urls')),
+    (r'^rsr/gateway/', include('akvo.gateway.urls')),
 
 )
 
