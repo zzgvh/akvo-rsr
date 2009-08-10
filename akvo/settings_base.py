@@ -47,8 +47,10 @@ INSTALLED_APPS = (
     'akvo.gateway',
     'template_utils', #see http://code.google.com/p/django-template-utils/
     'registration', #see http://code.google.com/p/django-registration/
+    'goflow.workflow', #see http://code.google.com/p/goflow/
+    'goflow.runtime', #see http://code.google.com/p/goflow/
     #'django_granular_permissions',
-#    'akvo.status',
+    #'akvo.status',
     # Added by Paul 09/02/2009
     'paypal.standard',
     'sorl.thumbnail',

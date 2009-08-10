@@ -5,6 +5,7 @@ from django.contrib.sites.models import Site
 from django.core.mail import send_mail
 from django.template import loader, Context
 
+import logging
 
 from paypal.standard.models import PayPalIPN
 
@@ -73,3 +74,12 @@ def rsr_send_mail_to_users(users, subject='templates/email/test_subject.txt',
 def qs_column_sum(qs, col):
     "return sum of a queryset column"
     return sum(qs.values_list(col, flat=True))
+
+def setup_logging(app_name):
+    logger = logging.getLogger(app_name)
+    handler = logging.FileHandler(settings.LOG_FILE_NAME)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(settings.LOG_LEVEL)
+    return logger
