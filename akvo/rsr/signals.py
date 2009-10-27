@@ -12,6 +12,23 @@ from django.db.models import get_model, ImageField
 
 from sorl.thumbnail.fields import ImageWithThumbnailsField
 
+from utils import setup_logging
+
+logger = setup_logging('rsr.signals')
+
+def create_update_from_sms(sender, **kwargs):
+    """
+    called when an sms callback is made to try and create a project update
+    """
+    logger.debug("Entering: create_update_from_sms()")
+    if kwargs.get('created', False):
+        new_sms = kwargs['instance']
+        u = get_model('rsr', 'UserProfile').objects.get_sms_sender(new_sms)
+        if u:
+            logger.debug("Found user matching sender")
+            u.create_sms_update(new_sms)
+    logger.debug("Exiting: create_update_from_sms()")
+
 def create_publishing_status(sender, **kwargs):
     """
     called when a new project is saved so an associated published record for the

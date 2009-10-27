@@ -607,7 +607,7 @@ class ProjectAdmin(admin.ModelAdmin):
 
 admin.site.register(get_model('rsr', 'project'), ProjectAdmin)
 
-
+    
 class UserProfileAdminForm(forms.ModelForm):
     """
     This form dispalys two extra fields that show if the ser belongs to the groups
@@ -632,10 +632,82 @@ class UserProfileAdminForm(forms.ModelForm):
             kwargs.update({'initial': initial_data})
         super(UserProfileAdminForm, self).__init__(*args, **kwargs)
 
+#class SmsReportInlineFormSet(BaseInlineFormSet):
+#    """
+#    call __init__ on BaseFormSet, not direct parent
+#    """
+#    def __init__(self, *args, **kwargs):
+#        super(BaseModelFormSet, self).__init__(*args, **kwargs)
+
+class SmsReportInline(admin.TabularInline):
+    model = get_model('rsr', 'smsreport')
+    extra = 1
+
+    def formfield_for_dbfield(self, db_field, **kwargs):
+        """
+        Hook for specifying the form Field instance for a given database Field
+        instance.
+
+        If kwargs are given, they're passed to the form Field's constructor.
+        Added by GvH:
+        Overridden to implement limits to project list select for org users.
+        """
+        request = kwargs.pop("request", None)
+        
+        # Added by GvH
+        # Limit the choices of the project db_field to projects linked to user's org
+        # if we have an org user
+        if db_field.attname == 'project_id':
+            opts = self.opts
+            user = request.user
+            if user.has_perm(opts.app_label + '.' + get_rsr_limited_change_permission(opts)):
+                db_field.rel.limit_choices_to = {'pk__in': user.get_profile().organisation.all_projects()}
+            
+        # If the field specifies choices, we don't need to look for special
+        # admin widgets - we just need to use a select widget of some kind.
+        if db_field.choices:
+            return self.formfield_for_choice_field(db_field, request, **kwargs)
+
+        # ForeignKey or ManyToManyFields
+        if isinstance(db_field, (models.ForeignKey, models.ManyToManyField)):
+            # Combine the field kwargs with any options for formfield_overrides.
+            # Make sure the passed in **kwargs override anything in
+            # formfield_overrides because **kwargs is more specific, and should
+            # always win.
+            if db_field.__class__ in self.formfield_overrides:
+                kwargs = dict(self.formfield_overrides[db_field.__class__], **kwargs)
+
+            # Get the correct formfield.
+            if isinstance(db_field, models.ForeignKey):
+                formfield = self.formfield_for_foreignkey(db_field, request, **kwargs)
+            elif isinstance(db_field, models.ManyToManyField):
+                formfield = self.formfield_for_manytomany(db_field, request, **kwargs)
+
+            # For non-raw_id fields, wrap the widget with a wrapper that adds
+            # extra HTML -- the "add other" interface -- to the end of the
+            # rendered output. formfield can be None if it came from a
+            # OneToOneField with parent_link=True or a M2M intermediary.
+            if formfield and db_field.name not in self.raw_id_fields:
+                formfield.widget = widgets.RelatedFieldWidgetWrapper(formfield.widget, db_field.rel, self.admin_site)
+
+            return formfield
+
+        # If we've got overrides for the formfield defined, use 'em. **kwargs
+        # passed to formfield_for_dbfield override the defaults.
+        for klass in db_field.__class__.mro():
+            if klass in self.formfield_overrides:
+                kwargs = dict(self.formfield_overrides[klass], **kwargs)
+                return db_field.formfield(**kwargs)
+
+        # For any other type of field, just call its formfield() method.
+        return db_field.formfield(**kwargs)
+        
 class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
     list_display = ('user_name', 'organisation', 'get_is_active', 'get_is_org_admin', 'get_is_org_editor',)
     list_filter  = ('organisation', )
     form = UserProfileAdminForm
+    inlines = [SmsReportInline,]
+
 
     #Methods overridden from ModelAdmin (django/contrib/admin/options.py)
     def get_form(self, request, obj=None, **kwargs):

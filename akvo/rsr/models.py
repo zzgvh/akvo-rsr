@@ -31,15 +31,27 @@ from django.utils.translation import ugettext_lazy as _
 
 from registration.models import RegistrationProfile, RegistrationManager
 from sorl.thumbnail.fields import ImageWithThumbnailsField
+
+from akvo.gateway.models import GatewayNumber, MoSms
+
 from akvo.settings import MEDIA_ROOT
 
-from utils import (GROUP_RSR_EDITORS, RSR_LIMITED_CHANGE, GROUP_RSR_PARTNER_ADMINS,
-				   GROUP_RSR_PARTNER_EDITORS)
-from utils import (PAYPAL_INVOICE_STATUS_PENDING, PAYPAL_INVOICE_STATUS_VOID,
-				   PAYPAL_INVOICE_STATUS_COMPLETE, PAYPAL_INVOICE_STATUS_STALE)
-from utils import groups_from_user, rsr_image_path, rsr_send_mail_to_users, qs_column_sum
-from signals import (change_name_of_file_on_change, change_name_of_file_on_create,
-					 create_publishing_status, create_organisation_account, create_paypal_gateway)
+from utils import (
+    GROUP_RSR_EDITORS, RSR_LIMITED_CHANGE, GROUP_RSR_PARTNER_ADMINS, GROUP_RSR_PARTNER_EDITORS
+)
+from utils import (
+    PAYPAL_INVOICE_STATUS_PENDING, PAYPAL_INVOICE_STATUS_VOID,
+    PAYPAL_INVOICE_STATUS_COMPLETE, PAYPAL_INVOICE_STATUS_STALE
+)
+from utils import (
+    groups_from_user, rsr_image_path, rsr_send_mail_to_users, qs_column_sum, setup_logging
+)
+from signals import (
+    change_name_of_file_on_change, change_name_of_file_on_create, create_publishing_status,
+    create_organisation_account, create_update_from_sms, create_paypal_gateway
+)
+
+logger = setup_logging('rsr.models')
 
 #Custom manager
 #based on http://www.djangosnippets.org/snippets/562/ and
@@ -904,8 +916,6 @@ class FieldPartner(models.Model):
     #    def __unicode__(self):
     #        return self.project.__unicode__()
 
-
-        
 PHOTO_LOCATIONS = (
     ('B', _('At the beginning of the update')),
     ('E', _('At the end of the update')),
@@ -921,10 +931,17 @@ UPDATE_METHODS = (
 def isValidGSMnumber(field_data, all_data):
     #TODO: fix for django 1.0
     pass
-	#if not field_data.startswith("467"):
-	#	raise validators.ValidationError("The phone number must start with 467")
-	#if not len(field_data) == 11:
-	#	raise validators.ValidationError("The phone number must be 11 digits long.")
+    #if not field_data.startswith("467"):
+    #	raise validators.ValidationError("The phone number must start with 467")
+    #if not len(field_data) == 11:
+    #	raise validators.ValidationError("The phone number must be 11 digits long.")
+
+class UserProfileManager(models.Manager):
+    def get_sms_sender(self, mo_sms):
+        try:
+            return self.get(phone_number__exact=mo_sms.sender)
+        except:
+            return None
 
 class UserProfile(models.Model):
     '''
@@ -940,7 +957,8 @@ class UserProfile(models.Model):
         #TODO: fix to django 1.0
         #validator_list = [isValidGSMnumber]
     )    
-    #project         = models.ForeignKey(Project, null=True, blank=True, )
+
+    objects         = UserProfileManager()
     
     def __unicode__(self):
         return self.user.username
@@ -1007,37 +1025,62 @@ class UserProfile(models.Model):
     
     #mobile akvo
 
-    def create_sms_update(self, mo_sms_raw):
-        # does the user have a project to update? TODO: security!
-        if self.project:
-            update_data = {
-                'project': self.project,
-                'user': self.user,
-                'title': 'SMS update',
-                'update_method': 'S',
-                'text': mo_sms_raw.text,
-                'time': datetime.fromtimestamp(float(mo_sms_raw.delivered)),
-            }
-            #update_data.update(sms_data)
+    def create_sms_update(self, mo_sms):
+        logger.debug("Entering: create_sms_update()")
+        try:
+            p = SmsReporting.objects.get(userprofile=self, gw_number__number__exact=mo_sms.receiver).project
+        except:
+            logger.exception("Exception trying match an sms to a project. Locals:\n %s\n\n" % locals())
+            return False
+        update_data = {
+            'project': p,
+            'user': self.user,
+            'title': 'SMS update',
+            'update_method': 'S',
+            'text': mo_sms.message,
+            'time': mo_sms.saved_at,
+        }
+        try:
             pu = ProjectUpdate.objects.create(**update_data)
+            logger.debug("Created new project update from sms")
+            logger.debug("Exiting: create_sms_update()")
             return pu
+        except:
+            logger.exception("Exception when creating an sms project update. Locals:\n %s\n\n" % locals())
+            return False
+
+    # needs re-visit        
+    #def create_mms_update(self, mo_mms_raw):
+    #    # does the user have a project to update? TODO: security!
+    #    if self.project:
+    #        update_data = {
+    #            'project': self.project,
+    #            'user': self.user,
+    #            'title': mo_mms_raw.subject,
+    #            'update_method': 'S',
+    #            'time': datetime.fromtimestamp(float(mo_mms_raw.time)),
+    #        }
+    #        attachements = mo_mms_raw.get_mms_files()
+    #        update_data.update(attachements)
+    #        pu = ProjectUpdate.objects.create(**update_data)
+    #        return pu
+    #    return False
+
+    # methods added from goflow
+    def save(self, **kwargs):
+        if not self.last_notif: self.last_notif = datetime.now()
+        models.Model.save(self,  **kwargs)
+    
+    def check_notif_to_send(self):
+        now = datetime.now()
+        if now > self.last_notif + timedelta(days=self.notif_delay or 1):
+            return True
         return False
-        
-    def create_mms_update(self, mo_mms_raw):
-        # does the user have a project to update? TODO: security!
-        if self.project:
-            update_data = {
-                'project': self.project,
-                'user': self.user,
-                'title': mo_mms_raw.subject,
-                'update_method': 'S',
-                'time': datetime.fromtimestamp(float(mo_mms_raw.time)),
-            }
-            attachements = mo_mms_raw.get_mms_files()
-            update_data.update(attachements)
-            pu = ProjectUpdate.objects.create(**update_data)
-            return pu
-        return False
+    
+    def notif_sent(self):
+        now = datetime.now()
+        self.last_notif = now
+        self.save()
 
     class Meta:
         permissions = (
@@ -1066,6 +1109,15 @@ user_activated.connect(user_activated_callback)
 def create_rsr_profile(user, profile):
     return UserProfile.objects.create(user=user, organisation=Organisation.objects.get(pk=profile['org_id']))
 
+
+class SmsReport(models.Model):
+    """
+    Mapping between projects, gateway phone numbers and users phones
+    """
+    userprofile = models.ForeignKey(UserProfile)
+    gw_number   = models.ForeignKey(GatewayNumber)
+    project     = models.ForeignKey(Project, null=True, blank=True, )
+    
 
 class MoMmsRaw(models.Model):
     '''
@@ -1298,3 +1350,4 @@ pre_save.connect(change_name_of_file_on_change, sender=Organisation)
 pre_save.connect(change_name_of_file_on_change, sender=Project)
 pre_save.connect(change_name_of_file_on_change, sender=ProjectUpdate)
 
+post_save.connect(create_update_from_sms, sender=MoSms)

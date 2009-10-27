@@ -2,43 +2,58 @@
 # See more details in the license.txt file located at the root folder of the Akvo RSR module. 
 # For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
 
-from akvo.rsr.models import Organisation, Project, ProjectUpdate, ProjectComment, FundingPartner, MoSmsRaw, PHOTO_LOCATIONS, STATUSES, UPDATE_METHODS
-from akvo.rsr.models import UserProfile, MoMmsRaw, MoMmsFile
-from akvo.rsr.forms import OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm# , RSR_RegistrationForm, RSR_PasswordChangeForm, RSR_AuthenticationForm, RSR_RegistrationProfile
 
-from django import forms
+# === django imports === #
+from django import forms, http
+
 from django.conf import settings
+
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm, PasswordResetForm, SetPasswordForm, PasswordChangeForm
+from django.contrib.auth.forms import (
+    AuthenticationForm, PasswordResetForm, SetPasswordForm, PasswordChangeForm
+)
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.core.urlresolvers import reverse
+
 from django.forms import ModelForm
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response, get_object_or_404
-from django.template import RequestContext
+from django.template import RequestContext, Context, loader
+
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
 
-
-from BeautifulSoup import BeautifulSoup
+# === std lib imports === #
 from datetime import datetime
 import time
-import feedparser
-from registration.models import RegistrationProfile
 import random
 
-REGISTRATION_RECEIVERS = ['gabriel@akvo.org', 'thomas@akvo.org', 'beth@akvo.org']
-
-# PAUL
-from akvo.rsr.models import PayPalInvoice
+# === packages imports === #
+import feedparser
+from BeautifulSoup import BeautifulSoup
+from registration.models import RegistrationProfile
 from paypal.standard.forms import PayPalPaymentsForm
 
-from django import http
-from django.template import Context, loader
+# === rsr imports === #
+from utils import setup_logging
+from models import (
+    Organisation, Project, ProjectUpdate, ProjectComment, FundingPartner,
+    MoSmsRaw, PHOTO_LOCATIONS, STATUSES, UPDATE_METHODS, UserProfile, MoMmsRaw,
+    MoMmsFile, PayPalInvoice
+)
+from forms import (
+    OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm
+)
+
+logger = setup_logging('rsr.views')
+
+REGISTRATION_RECEIVERS = ['gabriel@akvo.org', 'thomas@akvo.org', 'beth@akvo.org']
 
 def server_error(request, template_name='500.html'):
     '''
