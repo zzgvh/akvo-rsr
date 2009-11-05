@@ -495,7 +495,9 @@ def update_user_profile(request,
                         extra_context=None
                        ):
     if request.method == 'POST':
-        form = form_class(data=request.POST, files=request.FILES)
+        form = form_class(request=request, data=request.POST, files=request.FILES)
+        #from dbgp.client import brk
+        #brk(host="localhost", port=9000)
         if form.is_valid():
             updated_user = form.update(request.user)
             return HttpResponseRedirect(success_url)
@@ -503,6 +505,7 @@ def update_user_profile(request,
         form = form_class(initial={
             'first_name':request.user.first_name,
             'last_name':request.user.last_name,
+            'phone_number':request.user.get_profile().phone_number,
         })
     if extra_context is None:
         extra_context = {}

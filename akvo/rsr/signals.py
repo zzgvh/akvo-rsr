@@ -16,18 +16,6 @@ from utils import setup_logging
 
 logger = setup_logging('rsr.signals')
 
-def create_update_from_sms(sender, **kwargs):
-    """
-    called when an sms callback is made to try and create a project update
-    """
-    logger.debug("Entering: create_update_from_sms()")
-    if kwargs.get('created', False):
-        new_sms = kwargs['instance']
-        u = get_model('rsr', 'UserProfile').objects.get_sms_sender(new_sms)
-        if u:
-            logger.debug("Found user matching sender")
-            u.create_sms_update(new_sms)
-    logger.debug("Exiting: create_update_from_sms()")
 
 def create_publishing_status(sender, **kwargs):
     """
@@ -116,3 +104,27 @@ def create_paypal_gateway(sender, **kwargs):
         ppgs = get_model('rsr', 'paypalgatewayselector').objects
         ppgs.create(gateway=default_gateway, project=new_project)
 
+def handle_incoming_sms(sender, **kwargs):
+    """
+    called when an sms callback is made
+    we need to figureout what to do with the SMS depending on the WorkflowActivity
+    associated with it (through the sender's phone number)
+    """
+    logger.debug("Entering: handle_incoming_sms()")
+    if kwargs.get('created', False):
+        new_sms = kwargs['instance']
+        try:
+            profile = get_model('rsr', 'UserProfile').objects.process_sms(new_sms)
+        except Exception, e:
+            logger.debug("handle_incoming_sms() exception: %s" % e.message)
+    logger.debug("Exiting: handle_incoming_sms()")
+
+
+def handle_sms_workflow(sender, **kwargs):
+    up = kwargs['instance'] # we're getting a UserProfile to work with
+    #u.objects.make_random_password(6).lower()
+    if up.workflow_activity:
+        pass # for now...here we should reset the wf for phone registration
+    else:
+        if up.phone_number:
+            wa = up.create_sms_update_workflow()

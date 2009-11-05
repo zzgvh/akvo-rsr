@@ -639,8 +639,8 @@ class UserProfileAdminForm(forms.ModelForm):
 #    def __init__(self, *args, **kwargs):
 #        super(BaseModelFormSet, self).__init__(*args, **kwargs)
 
-class SmsReportInline(admin.TabularInline):
-    model = get_model('rsr', 'smsreport')
+class SmsReporterInline(admin.TabularInline):
+    model = get_model('rsr', 'smsreporter')
     extra = 1
 
     def formfield_for_dbfield(self, db_field, **kwargs):
@@ -706,7 +706,7 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
     list_display = ('user_name', 'organisation', 'get_is_active', 'get_is_org_admin', 'get_is_org_editor',)
     list_filter  = ('organisation', )
     form = UserProfileAdminForm
-    inlines = [SmsReportInline,]
+    inlines = [SmsReporterInline,]
 
 
     #Methods overridden from ModelAdmin (django/contrib/admin/options.py)
@@ -821,6 +821,19 @@ class ProjectCommentAdmin(admin.ModelAdmin):
     list_filter     = ('project', 'time', )
 
 admin.site.register(get_model('rsr', 'projectcomment'), ProjectCommentAdmin)
+
+
+### Admin models for workflow ###
+
+class WorkflowHistoryInline(admin.StackedInline):
+    model = get_model('workflow', 'WorkflowHistory')
+    extra = 1
+    
+class WorkflowActivityAdmin(admin.ModelAdmin):
+    model = get_model('workflow', 'WorkflowActivity')
+    inlines = [WorkflowHistoryInline,]
+
+admin.site.register(get_model('workflow', 'WorkflowActivity'), WorkflowActivityAdmin)
 
 
 # PayPal

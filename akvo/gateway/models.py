@@ -9,6 +9,8 @@ from django.utils.translation import ugettext, ugettext_lazy as _
 
 from datetime import datetime
 
+import urllib
+import urllib2
 class Gateway(models.Model):
     """
 
@@ -16,18 +18,18 @@ class Gateway(models.Model):
     name        = models.SlugField(
         _(u'gateway name'), max_length=30,
         help_text='''
-            The name is used in the call back to determine the gateway used.
+            The name is used in the callback to determine the gateway used.
             For example if the name is "42it" the callback path will be /gateway/42it/
         '''
     )
-    host_name   = models.CharField(_(u'host name'), max_length=255)
-    send_path   = models.CharField(_(u'send message path'), max_length=255)
+    host_name   = models.CharField(_(u'host name'), max_length=255, help_text=_(u'Host name to use when sending an SMS through the gateway'), )
+    send_path   = models.CharField(_(u'send message path'), max_length=255, help_text=_(u'Path at gateway when sending an SMS'), )
 
-    sender      = models.CharField(_(u'sender'),    max_length=30)
-    receiver    = models.CharField(_(u'receiver'),  max_length=30)
-    message     = models.CharField(_(u'message'),   max_length=30)
-    timestamp   = models.CharField(_(u'timestamp'), max_length=30)
-    msg_id      = models.CharField(_(u'msg_id'),    max_length=30)
+    sender      = models.CharField(_(u'sender'),    max_length=30, help_text=_(u"Sender's phone number"), )
+    receiver    = models.CharField(_(u'receiver'),  max_length=30, help_text=_(u'Receiving number at gateway'), )
+    message     = models.CharField(_(u'message'),   max_length=30, help_text=_(u'The message text'), )
+    timestamp   = models.CharField(_(u'timestamp'), max_length=30, help_text=_(u'Gateway timestamp'), )
+    msg_id      = models.CharField(_(u'msg_id'),    max_length=30, help_text=_(u'Gateway message id'), )
 
     def __unicode__(self):
         return self.name
@@ -36,6 +38,21 @@ class Gateway(models.Model):
         return '<br />'.join([gw_number.number for gw_number in self.gatewaynumber_set.all()])
     numbers.allow_tags = True
 
+#mapping between the gateways field names and ours for default fields (they should be the minimum set needed to send)
+GW_SENDING_FIELDS_42IT = {
+    'mt_number' : 'to',
+    'gw_number' : 'from',
+    'message'   : 'message',
+}
+# "static data for GW_SEMDING_FIELDS and extra fields with data
+GW_SENDING_DATA_42IT = {
+    # default
+    'username'  : 'Concinnity',
+    'password'  : '9391167',
+    # extra
+    'route'     : '2',
+}
+
 class GatewayNumber(models.Model):
     gateway = models.ForeignKey(Gateway)     
     number  = models.CharField(_(u'gateway number'), max_length=30)
@@ -43,6 +60,16 @@ class GatewayNumber(models.Model):
     def __unicode__(self):
         return '%s: %s' % (self.gateway, self.number)
 
+    def send_sms(self, mt_number, message):
+        send_fields = GW_SENDING_FIELDS_42IT #TODO: generalize to handle any defined gateway
+        data = GW_SENDING_DATA_42IT #TODO: generalize to handle any defined gateway
+        gw_number = self.number
+        for field_name in ['gw_number', 'mt_number', 'message',]:
+            data[send_fields[field_name]] = locals()[field_name]
+        url_values = urllib.urlencode(data)
+        gw = self.gateway
+        full_url = 'http://%s%s?%s' % (gw.host_name, gw.send_path, url_values)
+        data = urllib2.urlopen(full_url)
     
 #class GatewayCallbackApiField(models.Model):
 #    FIELD_CHOICES = (
@@ -69,7 +96,7 @@ class GatewayNumber(models.Model):
 #            'receiver'          : 'to',
 #            'message'           : 'text',
 #            'getaway_timestamp' : 'delivered',
-#            'gateway_id'        : 'incsmsid',
+#            'gateway_id'        : 'delivered',
 #        }
 #    },
 #    'clickatell': {
@@ -119,6 +146,10 @@ class MoSms(models.Model):
 
     @classmethod
     def new_sms(self, request, gateway):
+        """
+        Handle callback from gateway, creating a generic object representing
+        an incoming SMS
+        """
         request.encoding = 'iso-8859-1' #TODO: some GWs allow this to be set I think
         try:
             # if we find an mms already, do nuthin...

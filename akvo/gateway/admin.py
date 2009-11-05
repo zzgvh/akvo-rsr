@@ -6,7 +6,7 @@
 
 from django.contrib import admin
 from django.db.models import get_model
-
+from django.utils.translation import ugettext, ugettext_lazy as _
 
 #class GatewayCallbackApiFieldInLine(admin.TabularInline):
 #    model   = get_model('gateway', 'gatewaycallbackapifield')
@@ -22,6 +22,22 @@ class GatewayAdmin(admin.ModelAdmin):
     model = get_model('gateway', 'gateway')
     list_display = ('name', 'host_name', 'send_path', 'numbers', )
     inlines = [GatewayNumberInLine, ]
+    fieldsets = (
+        (_(u'Gateway general info'), {
+            'fields': (
+                'name', 'host_name', 'send_path',
+            ),
+         }),
+        (_(u'Query string variable names'), {
+            'description': _(u'''<p style="margin-left:0; padding-left:0; margin-top:1em; width:75%;">
+                                The names of the query string varibles for mo sms http callback.
+                            </p>'''),
+            'fields': (
+                'sender', 'receiver', 'message', 'timestamp', 'msg_id',
+            ),
+         }),
+    )
+     
     
 admin.site.register(get_model('gateway', 'gateway'), GatewayAdmin)
 

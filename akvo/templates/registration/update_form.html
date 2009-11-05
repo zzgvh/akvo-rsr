@@ -49,7 +49,7 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
             
         
         <form method="post" action="">
-        {{ form.username }}
+
         <fieldset class="form">
 
             <div id="fist_last_names" class="clearfix">
@@ -75,6 +75,21 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
                 <p class="about_field_extended">{% trans 'Your first and last name will be displayed when you post comments or updates to Akvo.' %}</p>
             </div>
             <hr>
+            <div id="sms_updates" class="clearfix">
+                <label style="padding-top: 10px;">{% trans 'If you want to send updates to a project, enter info here.' %}</label>
+                {% if form.phone_number.errors %}
+                <div class="form_error">
+                    <p class="c1">{% trans 'A problem occurred' %}</p>
+                    {% if form.phone_number.errors %}
+                    <p>{{ form.phone_number.errors|join:", " }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}              
+                {{ form.phone_number }}
+                <p class="about_field">{% trans 'Mobile phone number (Including country code: +NN NNN NNNN)' %}.</p>
+            </div>
+            <hr>
+                
 
 		{% submit_button _('Submit') 'ab_white' %}
 

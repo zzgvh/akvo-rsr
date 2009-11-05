@@ -125,6 +125,7 @@ urlpatterns = patterns('',
     #    {'document_root': '/var/dev/akvo/mediaroot/', 'show_indexes': True}),
     
     (r'^rsr/gateway/', include('akvo.gateway.urls')),
+    (r'^rsr/notices/', include('notification.urls')),
 )
 
 

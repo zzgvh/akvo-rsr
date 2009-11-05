@@ -31,8 +31,12 @@ from django.utils.translation import ugettext_lazy as _
 
 from registration.models import RegistrationProfile, RegistrationManager
 from sorl.thumbnail.fields import ImageWithThumbnailsField
+from  workflow.models import (
+    Workflow, WorkflowActivity, WorkflowHistory, Participant, Event, Role, State,
+    workflow_started, workflow_transitioned
+)
 
-from akvo.gateway.models import GatewayNumber, MoSms
+from akvo.gateway.models import Gateway, GatewayNumber, MoSms
 
 from akvo.settings import MEDIA_ROOT
 
@@ -48,7 +52,8 @@ from utils import (
 )
 from signals import (
     change_name_of_file_on_change, change_name_of_file_on_create, create_publishing_status,
-    create_organisation_account, create_update_from_sms, create_paypal_gateway
+    create_organisation_account, handle_incoming_sms, create_paypal_gateway,
+    handle_sms_workflow
 )
 
 logger = setup_logging('rsr.models')
@@ -937,26 +942,33 @@ def isValidGSMnumber(field_data, all_data):
     #	raise validators.ValidationError("The phone number must be 11 digits long.")
 
 class UserProfileManager(models.Manager):
-    def get_sms_sender(self, mo_sms):
-        try:
-            return self.get(phone_number__exact=mo_sms.sender)
-        except:
-            return None
+    def process_sms(self, mo_sms):
+        profile = self.get(phone_number__exact=mo_sms.sender)
+        wa = profile.workflow_activity
+        if wa:
+            current = wa.current_state()
+            if current.state == State.objects.get(name__iexact='Phone number added'):
+                reporter = profile.smsreporter_set.get(validation__exact=mo_sms.message)
+                reporter.validation = SmsReporter.VALIDATED
+                reporter.save()
+            elif current.state == State.objects.get(name__iexact='Phone number validated'):
+                pass
+            elif current.state == State.objects.get(name__iexact='Project linked'):
+                pass
+            else:
+                pass
+        else:
+            raise("UserProfileManager error: No WorkflowActivity to handle incoming SMS")
+ROLE_SMS_UPDATER = u'SMS Updater'
 
 class UserProfile(models.Model):
     '''
     Extra info about a user.
     '''
-    user            = models.ForeignKey(User, unique=True) # TODO: should be a OneToOneField
-    organisation    = models.ForeignKey(Organisation)
-    phone_number    = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text	  = """Please use the following format: <strong>467XXXXXXXX</strong>.
-        <br>Example: the number 070 765 43 21 would be entered as 46707654321""",
-        #TODO: fix to django 1.0
-        #validator_list = [isValidGSMnumber]
-    )    
+    user                = models.ForeignKey(User, unique=True) # TODO: should be a OneToOneField
+    organisation        = models.ForeignKey(Organisation)
+    phone_number        = models.CharField(max_length=50, blank=True,)
+    workflow_activity	= models.OneToOneField(WorkflowActivity, related_name='wf_object', null=True, blank=True)
 
     objects         = UserProfileManager()
     
@@ -1024,6 +1036,39 @@ class UserProfile(models.Model):
             user.save()
     
     #mobile akvo
+    
+    def create_sms_update_workflow(self):
+        """
+        Called when a phone number is saved to the profile. Sets up a workflow
+        for registering a mobile phone with RSR for project updates
+        """
+        # TODO: the start of this method can probably be generalized to a
+        # create_FOO_workflow() call returning the wa for special handling
+        user = self.user
+        # the system account is used for the workflow logging of actions originating in the system itself
+        system_acct = User.objects.get(username='system')
+        wf = Workflow.objects.get(slug='sms-update')
+        # the workflowactivity instanciates the workflow
+        wa = WorkflowActivity.objects.create(workflow=wf, created_by=user)
+        self.workflow_activity = wa
+        self.save()
+        wa.save()
+        # the system acct needs to be a Particpant to be able to log workflowhistory objects
+        assigner = Participant.objects.create(user=system_acct, workflowactivity=wa)
+        # set up the user as a partner editor for this project, if possible
+        sms_updater = Role.objects.get(name=ROLE_SMS_UPDATER)
+        wa.assign_role(system_acct, user, sms_updater)
+        # now all is set for actually starting the wf!
+        wa.start(user)
+        # Setup for phone validation
+        validation = User.objects.make_random_password(length=6).upper()
+        # TODO: gateway selection!
+        gw_number = Gateway.objects.get(name='42it').gatewaynumber_set.all()[0]
+        reporter = SmsReporter.objects.create(userprofile=self, gw_number=gw_number, validation=validation)
+        reporter.create_validation_request()
+        event = Event.objects.get(name='SMS from gateway')
+        wa.log_event(event, user, note='Sended som SMSes and mailses')
+        return wa    
 
     def create_sms_update(self, mo_sms):
         logger.debug("Entering: create_sms_update()")
@@ -1066,21 +1111,6 @@ class UserProfile(models.Model):
     #        return pu
     #    return False
 
-    # methods added from goflow
-    def save(self, **kwargs):
-        if not self.last_notif: self.last_notif = datetime.now()
-        models.Model.save(self,  **kwargs)
-    
-    def check_notif_to_send(self):
-        now = datetime.now()
-        if now > self.last_notif + timedelta(days=self.notif_delay or 1):
-            return True
-        return False
-    
-    def notif_sent(self):
-        now = datetime.now()
-        self.last_notif = now
-        self.save()
 
     class Meta:
         permissions = (
@@ -1109,15 +1139,26 @@ user_activated.connect(user_activated_callback)
 def create_rsr_profile(user, profile):
     return UserProfile.objects.create(user=user, organisation=Organisation.objects.get(pk=profile['org_id']))
 
-
-class SmsReport(models.Model):
+from utils import send_now
+class SmsReporter(models.Model):
     """
     Mapping between projects, gateway phone numbers and users phones
     """
+    VALIDATED = 'IS_VALID' # _ guarantees validation code will never be generated to equal VALIDATED
     userprofile = models.ForeignKey(UserProfile)
     gw_number   = models.ForeignKey(GatewayNumber)
     project     = models.ForeignKey(Project, null=True, blank=True, )
+    validation  = models.CharField(_('validation code'), max_length=20)
     
+    def create_validation_request(self):
+        # check we aren't already validated
+        if self.validation != self.VALIDATED:
+            extra_context = {
+                'gw_number':    self.gw_number,
+                'validation':   self.validation,
+                'phone_number': self.userprofile.phone_number
+            }
+            send_now([self.userprofile.user], 'phone_added', extra_context=extra_context, on_site=True)
 
 class MoMmsRaw(models.Model):
     '''
@@ -1350,4 +1391,5 @@ pre_save.connect(change_name_of_file_on_change, sender=Organisation)
 pre_save.connect(change_name_of_file_on_change, sender=Project)
 pre_save.connect(change_name_of_file_on_change, sender=ProjectUpdate)
 
-post_save.connect(create_update_from_sms, sender=MoSms)
+post_save.connect(handle_incoming_sms, sender=MoSms)
+post_save.connect(handle_sms_workflow, sender=UserProfile)

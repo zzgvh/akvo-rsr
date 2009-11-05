@@ -176,15 +176,35 @@ class RSR_RegistrationFormUniqueEmail(RegistrationFormUniqueEmail):
 
 class RSR_ProfileUpdateForm(forms.Form):
 
-    first_name  = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
-    last_name   = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
-    #phone_number   = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
+    first_name      = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
+    last_name       = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
+    phone_number    = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict), required=False)
     #organisation   = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
 
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request') if kwargs.get('request') else None
+        super(RSR_ProfileUpdateForm, self).__init__(*args, **kwargs)
+
+    def clean_phone_number(self):
+        # TODO: validate phone number format
+        data = self.cleaned_data['phone_number']
+        if data:
+            try:
+                profile = UserProfile.objects.get(phone_number=data)
+            except:
+                return data
+            if profile != self.request.user.get_profile():
+                raise forms.ValidationError(_(u'Phone number is not unique!'))
+        return data
+        
     def update(self, user):
         user.first_name = self.cleaned_data['first_name']
         user.last_name  = self.cleaned_data['last_name']
-        user.save()        
+        user.save()
+        if self.cleaned_data.get('phone_number'):
+            up = user.get_profile()
+            up.phone_number = self.cleaned_data['phone_number']
+            up.save()
         return user
 
 class RSR_SetPasswordForm(SetPasswordForm):
