@@ -12,9 +12,8 @@ from django.db.models import get_model, ImageField
 
 from sorl.thumbnail.fields import ImageWithThumbnailsField
 
-from utils import setup_logging
-
-logger = setup_logging('rsr.signals')
+from utils import setup_logging, who_am_i
+logger = setup_logging()
 
 
 def create_publishing_status(sender, **kwargs):
@@ -104,23 +103,27 @@ def create_paypal_gateway(sender, **kwargs):
         ppgs = get_model('rsr', 'paypalgatewayselector').objects
         ppgs.create(gateway=default_gateway, project=new_project)
 
+
 def handle_incoming_sms(sender, **kwargs):
     """
-    called when an sms callback is made
-    we need to figureout what to do with the SMS depending on the WorkflowActivity
-    associated with it (through the sender's phone number)
+    called through post_save.connect(handle_incoming_sms, sender=MoSms)
     """
-    logger.debug("Entering: handle_incoming_sms()")
+    logger.debug("Entering: %s()" % who_am_i())
     if kwargs.get('created', False):
         new_sms = kwargs['instance']
         try:
             profile = get_model('rsr', 'UserProfile').objects.process_sms(new_sms)
-        except Exception, e:
-            logger.debug("handle_incoming_sms() exception: %s" % e.message)
-    logger.debug("Exiting: handle_incoming_sms()")
+        except:
+            logger.exception("Exception trying to match on MoSms to a UserProfile. Locals:\n %s\n\n" % locals())
+    logger.debug("Exiting: %s()" % who_am_i())
 
 
 def handle_sms_workflow(sender, **kwargs):
+    """
+    called by post_save.connect(handle_sms_workflow, sender=UserProfile)
+    create a new WorkflowActivity for UserProfile when a phone number is added
+    """
+    logger.debug("Entering: handle_incoming_sms()")
     up = kwargs['instance'] # we're getting a UserProfile to work with
     #u.objects.make_random_password(6).lower()
     if up.workflow_activity:

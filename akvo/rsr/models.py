@@ -56,7 +56,7 @@ from signals import (
     handle_sms_workflow
 )
 
-logger = setup_logging('rsr.models')
+logger = setup_logging()
 
 #Custom manager
 #based on http://www.djangosnippets.org/snippets/562/ and
@@ -951,6 +951,7 @@ class UserProfileManager(models.Manager):
                 reporter = profile.smsreporter_set.get(validation__exact=mo_sms.message)
                 reporter.validation = SmsReporter.VALIDATED
                 reporter.save()
+                wa.progress(current.state, profile.user, _('Phone number %s validated for %s' % (profile.phone_number, profile.user.username)))
             elif current.state == State.objects.get(name__iexact='Phone number validated'):
                 pass
             elif current.state == State.objects.get(name__iexact='Project linked'):
@@ -959,6 +960,7 @@ class UserProfileManager(models.Manager):
                 pass
         else:
             raise("UserProfileManager error: No WorkflowActivity to handle incoming SMS")
+            
 ROLE_SMS_UPDATER = u'SMS Updater'
 
 class UserProfile(models.Model):
@@ -1151,14 +1153,29 @@ class SmsReporter(models.Model):
     validation  = models.CharField(_('validation code'), max_length=20)
     
     def create_validation_request(self):
+        """
+        send validation code through email and an SMS that the user can easily
+        reply to with the code to validate the phone number
+        """
         # check we aren't already validated
         if self.validation != self.VALIDATED:
             extra_context = {
-                'gw_number':    self.gw_number,
-                'validation':   self.validation,
-                'phone_number': self.userprofile.phone_number
+                'gw_number'     : self.gw_number,
+                'validation'    : self.validation,
+                'phone_number'  : self.userprofile.phone_number
             }
             send_now([self.userprofile.user], 'phone_added', extra_context=extra_context, on_site=True)
+
+    def send_confirmation(self):
+        extra_context = {
+            'gw_number'     : self.gw_number,
+            'phone_number'  : self.userprofile.phone_number
+        }
+        send_now([self.userprofile.user], 'phone_confirmed', extra_context=extra_context, on_site=True)
+
+    class Meta:
+        unique_together = ('userprofile', 'gw_number', 'project',)
+
 
 class MoMmsRaw(models.Model):
     '''

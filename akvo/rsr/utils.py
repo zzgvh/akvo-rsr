@@ -13,6 +13,8 @@ from notification.models import (
     Notice, get_notification_language, should_send, LanguageStoreNotAvailable,
     get_formatted_messages
 )
+
+import inspect
 import logging
 
 RSR_LIMITED_CHANGE          = u'rsr_limited_change'
@@ -27,6 +29,30 @@ PAYPAL_INVOICE_STATUS_PENDING   = 1
 PAYPAL_INVOICE_STATUS_VOID      = 2
 PAYPAL_INVOICE_STATUS_COMPLETE  = 3
 PAYPAL_INVOICE_STATUS_STALE     = 4
+
+
+def setup_logging():
+    logger = logging.getLogger()
+    #handler = logging.FileHandler(settings.LOG_FILE_NAME)
+    #formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(message)s')
+    #handler.setFormatter(formatter)
+    #logger.addHandler(handler)
+    logger.setLevel(settings.LOG_LEVEL)
+    return logger
+
+#logger = setup_logging('rsr.utils')
+
+
+def who_am_i():
+    "introspecting function returning the name of the function where whoami is called"
+    return inspect.stack()[1][3]
+
+def who_is_parent():
+    """
+    introspecting function returning the name of the caller of the function
+    where whoami is called
+    """
+    return inspect.stack()[2][3]
 
 def groups_from_user(user):
     """
@@ -84,14 +110,6 @@ def qs_column_sum(qs, col):
     "return sum of a queryset column"
     return sum(qs.values_list(col, flat=True))
 
-def setup_logging(app_name):
-    logger = logging.getLogger(app_name)
-    handler = logging.FileHandler(settings.LOG_FILE_NAME)
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(settings.LOG_LEVEL)
-    return logger
 
 # modded from django-notification models.py
 

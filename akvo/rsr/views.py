@@ -51,7 +51,7 @@ from forms import (
     OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm
 )
 
-logger = setup_logging('rsr.views')
+logger = setup_logging()
 
 REGISTRATION_RECEIVERS = ['gabriel@akvo.org', 'thomas@akvo.org', 'beth@akvo.org']
 

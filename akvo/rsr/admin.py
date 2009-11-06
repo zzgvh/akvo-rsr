@@ -762,22 +762,23 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
                 return True
         return False
 
-    def save_form(self, request, form, change):
+    def save_model(self, request, obj, form, change):
         """
-        Given a ModelForm return an unsaved instance. ``change`` is True if
-        the object is being changed, and False if it's being added.
+        override of django.contrib.admin.options.save_model
         
         Act upon the checkboxes that fake admin settings for the partner users.
         """
-        userprofile = form.save(commit=False) #returns a user profile
+        #from dbgp.client import brk
+        #brk(host="localhost", port=9000)
+        #userprofile = form.save(commit=False) #returns a user profile
         is_active = form.cleaned_data['is_active']
         is_admin =  form.cleaned_data['is_org_admin']
         is_editor = form.cleaned_data['is_org_editor']
-        userprofile.set_is_active(is_active) #master switch
-        userprofile.set_is_org_admin(is_admin) #can modify other users user profile and own organisation
-        userprofile.set_is_org_editor(is_editor) #can edit projects
-        userprofile.set_is_staff(is_admin or is_editor) #implicitly needed to log in to admin
-        return form.save(commit=False)
+        obj.set_is_active(is_active) #master switch
+        obj.set_is_org_admin(is_admin) #can modify other users user profile and own organisation
+        obj.set_is_org_editor(is_editor) #can edit projects
+        obj.set_is_staff(is_admin or is_editor) #implicitly needed to log in to admin
+        obj.save()
 
 admin.site.register(get_model('rsr', 'userprofile'), UserProfileAdmin)
 

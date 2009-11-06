@@ -8,9 +8,9 @@ from django.conf import settings
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect
 
 from models import Gateway, MoSms
-from utils import setup_logging
+from utils import setup_logging, who_am_i
 
-logger = setup_logging('gateway.views')
+logger = setup_logging()
 
 def receive_sms(request, gw_name):
     '''

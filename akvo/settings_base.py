@@ -45,6 +45,7 @@ INSTALLED_APPS = (
     'django.contrib.humanize',
     'akvo.rsr',
     'akvo.gateway',
+    'akvo.log',
     'template_utils', #see http://code.google.com/p/django-template-utils/
     'registration', #see http://code.google.com/p/django-registration/
     'paypal.standard.ipn',
