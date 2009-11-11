@@ -1053,8 +1053,6 @@ class UserProfile(models.Model):
     
     #mobile akvo
     def enable_reporting(self, sms_reporter):
-        from dbgp.client import brk
-        brk(host="localhost", port=9000)
         wa = self.workflow_activity
         if self.validation == self.VALIDATED:
             current = wa.current_state()
