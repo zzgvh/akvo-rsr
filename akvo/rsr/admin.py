@@ -722,7 +722,7 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
         # non-superusers don't get to see it all
         if not request.user.is_superuser:
             # hide sms-realted stuff
-            self.exclude =  ('phone_number',)
+            self.exclude =  ('workflow_activity',)
             # user and org are only shown as text, not select widget
             self.readonly_fk = ('user', 'organisation',)
         # this is needed to remove some kind of caching on exclude and readonly_fk,
