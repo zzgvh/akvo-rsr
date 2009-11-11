@@ -41,7 +41,7 @@ def setup_logging():
     logger.setLevel(settings.LOG_LEVEL)
     return logger
 
-#logger = setup_logging('rsr.utils')
+logger = setup_logging()
 
 
 def who_am_i():
@@ -141,6 +141,7 @@ def send_now(users, label, extra_context=None, on_site=True):
     You can pass in on_site=False to prevent the notice emitted from being
     displayed on the site.
     """
+    logger.debug("Entering: %s()" % who_am_i())
     if extra_context is None:
         extra_context = {}
     
@@ -206,7 +207,9 @@ def send_now(users, label, extra_context=None, on_site=True):
                 'message': messages['sms.txt'],
             }, context)
             # extra_context['gw_number'] holds a GatewayNumber object
+            logger.debug("Sending SMS notification of type %S to %s." % (notice_type, user, ))
             extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
 
     # reset environment to original language
     activate(current_language)
+    logger.debug("Exiting: %s()" % who_am_i())

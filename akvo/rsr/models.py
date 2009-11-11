@@ -1065,12 +1065,14 @@ class UserProfile(models.Model):
                 try:
                     transition = Transition.objects.get(name__iexact="Link project")
                     wa.progress(transition, self.user, note=note)
+                    logger.debug('First project enabled for updating: %s Locals:\n %s\n\n' % (self.smsreporter_set.all()[0].project.pk, locals(), ))
                 except Exception, e:
                     logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
             elif current.state == State.objects.get(name__iexact='Updates enabled'):
                 try:
                     event = Event.objects.get(name='Project linked')
                     wa.log_event(event, self.user, note=note)
+                    logger.debug('New project enabled for updating: %s Locals:\n %s\n\n' % (self.smsreporter_set.all()[0].project.pk, locals(), ))
                 except Exception, e:
                     logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
             else:
