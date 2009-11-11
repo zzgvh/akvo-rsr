@@ -43,7 +43,7 @@ admin.site.register(get_model('gateway', 'gateway'), GatewayAdmin)
 
 
 class MoSmsAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('pk', 'sender', 'receiver', 'message', )    
 
 admin.site.register(get_model('gateway', 'mosms'), MoSmsAdmin)
 

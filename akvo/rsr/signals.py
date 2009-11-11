@@ -114,20 +114,6 @@ def handle_incoming_sms(sender, **kwargs):
         try:
             profile = get_model('rsr', 'UserProfile').objects.process_sms(new_sms)
         except:
-            logger.exception("Exception trying to match on MoSms to a UserProfile. Locals:\n %s\n\n" % locals())
+            logger.exception("Exception trying to match an MoSms to a UserProfile. Locals:\n %s\n\n" % locals())
     logger.debug("Exiting: %s()" % who_am_i())
 
-
-def handle_sms_workflow(sender, **kwargs):
-    """
-    called by post_save.connect(handle_sms_workflow, sender=UserProfile)
-    create a new WorkflowActivity for UserProfile when a phone number is added
-    """
-    logger.debug("Entering: handle_incoming_sms()")
-    up = kwargs['instance'] # we're getting a UserProfile to work with
-    #u.objects.make_random_password(6).lower()
-    if up.workflow_activity:
-        pass # for now...here we should reset the wf for phone registration
-    else:
-        if up.phone_number:
-            wa = up.create_sms_update_workflow()

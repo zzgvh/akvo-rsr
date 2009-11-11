@@ -204,7 +204,9 @@ def send_now(users, label, extra_context=None, on_site=True):
             sms = render_to_string('notification/email_subject.txt', {
                 'message': messages['sms.txt'],
             }, context)
-            extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
+            # extra_context['gw_number'] holds a GatewayNumber object
+            #extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
+            print "Sending SMS: %s" % (sms,)
 
     # reset environment to original language
     activate(current_language)

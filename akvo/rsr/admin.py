@@ -710,11 +710,19 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
 
 
     #Methods overridden from ModelAdmin (django/contrib/admin/options.py)
+
+    def save_formset(self, request, form, formset, change):
+        formset.save()
+        for initial_form in formset.initial_forms:
+            if initial_form.has_changed() and 'project' in initial_form.changed_data:
+                initial_form.instance.reporting_enabled()
+                form.instance.enable_reporting(initial_form.instance)
+        
     def get_form(self, request, obj=None, **kwargs):
         # non-superusers don't get to see it all
         if not request.user.is_superuser:
             # hide sms-realted stuff
-            self.exclude =  ('phone_number', 'project', )
+            self.exclude =  ('phone_number',)
             # user and org are only shown as text, not select widget
             self.readonly_fk = ('user', 'organisation',)
         # this is needed to remove some kind of caching on exclude and readonly_fk,
@@ -724,6 +732,9 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
             self.exclude =  None
             self.readonly_fk = ()
         form = super(UserProfileAdmin, self).get_form(request, obj, **kwargs)
+        if not request.user.is_superuser and obj.validation != obj.VALIDATED:
+            self.inlines = []
+            self.inline_instances = []
         return form
 
     def queryset(self, request):
@@ -764,13 +775,9 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """
-        override of django.contrib.admin.options.save_model
-        
-        Act upon the checkboxes that fake admin settings for the partner users.
+        override of django.contrib.admin.options.save_model        
         """
-        #from dbgp.client import brk
-        #brk(host="localhost", port=9000)
-        #userprofile = form.save(commit=False) #returns a user profile
+        # Act upon the checkboxes that fake admin settings for the partner users.
         is_active = form.cleaned_data['is_active']
         is_admin =  form.cleaned_data['is_org_admin']
         is_editor = form.cleaned_data['is_org_editor']
@@ -778,6 +785,18 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
         obj.set_is_org_admin(is_admin) #can modify other users user profile and own organisation
         obj.set_is_org_editor(is_editor) #can edit projects
         obj.set_is_staff(is_admin or is_editor) #implicitly needed to log in to admin
+        # workflow for mobile Akvo
+        #from dbgp.client import brk
+        #brk(host="localhost", port=9000)
+        if 'phone_number' in form.changed_data:
+            if form.cleaned_data['phone_number']:
+                wf = get_model('workflow', 'Workflow').objects.get(slug='sms-update')
+                # the workflowactivity instanciates the workflow
+                wa = get_model('workflow', 'WorkflowActivity').objects.create(workflow=wf, created_by=obj.user)
+                obj.create_sms_update_workflow(wa)
+                
+            else: #TODO: number removed, disable sms updting
+                pass
         obj.save()
 
 admin.site.register(get_model('rsr', 'userprofile'), UserProfileAdmin)

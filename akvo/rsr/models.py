@@ -27,13 +27,14 @@ from django.template import loader, Context
 from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import ugettext as __
 
 
 from registration.models import RegistrationProfile, RegistrationManager
 from sorl.thumbnail.fields import ImageWithThumbnailsField
 from  workflow.models import (
-    Workflow, WorkflowActivity, WorkflowHistory, Participant, Event, Role, State,
-    workflow_started, workflow_transitioned
+    Workflow, WorkflowActivity, WorkflowHistory, Participant, Event, Role,
+    State, Transition, workflow_started, workflow_transitioned
 )
 
 from akvo.gateway.models import Gateway, GatewayNumber, MoSms
@@ -48,12 +49,12 @@ from utils import (
     PAYPAL_INVOICE_STATUS_COMPLETE, PAYPAL_INVOICE_STATUS_STALE
 )
 from utils import (
-    groups_from_user, rsr_image_path, rsr_send_mail_to_users, qs_column_sum, setup_logging
+    groups_from_user, rsr_image_path, rsr_send_mail_to_users, qs_column_sum,
+    setup_logging, who_am_i
 )
 from signals import (
     change_name_of_file_on_change, change_name_of_file_on_create, create_publishing_status,
-    create_organisation_account, handle_incoming_sms, create_paypal_gateway,
-    handle_sms_workflow
+    create_organisation_account, handle_incoming_sms, create_paypal_gateway
 )
 
 logger = setup_logging()
@@ -948,14 +949,24 @@ class UserProfileManager(models.Manager):
         if wa:
             current = wa.current_state()
             if current.state == State.objects.get(name__iexact='Phone number added'):
-                reporter = profile.smsreporter_set.get(validation__exact=mo_sms.message)
-                reporter.validation = SmsReporter.VALIDATED
-                reporter.save()
-                wa.progress(current.state, profile.user, _('Phone number %s validated for %s' % (profile.phone_number, profile.user.username)))
+                # look for validation code
+                if profile.validation == mo_sms.message:
+                    profile.validation = profile.VALIDATED
+                    profile.save()
+                    try:
+                        transition = Transition.objects.get(name__iexact="Validate phone number")
+                        note = __(u'Phone number %s validated for %s' % (profile.phone_number, profile.user.username))
+                        wa.progress(transition, profile.user, note=note)
+                    except Exception, e:
+                        logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+                else:
+                    logger.exception('Error in UserProfileManager.process_sms: "%s" is not the correct validation code expected "%s". Locals:\n %s\n\n' % (mo_sms.message, profile.validation, locals()))
             elif current.state == State.objects.get(name__iexact='Phone number validated'):
-                pass
-            elif current.state == State.objects.get(name__iexact='Project linked'):
-                pass
+                # we shouldn't be here...phone ok, but no project selected :(
+                logger.exception('Error in UserProfileManager.process_sms: WA in state "Phone number validated" meaning phone is validated, but no project has been selected. Locals:\n %s\n\n' % (mo_sms.message, profile.validation, locals()))
+            elif current.state == State.objects.get(name__iexact='Updates enabled'):
+                # time to make an SMS update!
+                profile.create_sms_update(mo_sms)
             else:
                 pass
         else:
@@ -969,11 +980,14 @@ class UserProfile(models.Model):
     '''
     user                = models.ForeignKey(User, unique=True) # TODO: should be a OneToOneField
     organisation        = models.ForeignKey(Organisation)
-    phone_number        = models.CharField(max_length=50, blank=True,)
-    workflow_activity	= models.OneToOneField(WorkflowActivity, related_name='wf_object', null=True, blank=True)
+    phone_number        = models.CharField(max_length=50, blank=True,)# TODO: check uniqueness if non-empty
+    validation          = models.CharField(_('validation code'), max_length=20, blank=True,)
+    workflow_activity	= models.OneToOneField(WorkflowActivity, related_name='wf_object', null=True, blank=True,)
 
     objects         = UserProfileManager()
     
+    VALIDATED = 'IS_VALID' # _ in IS_VALID guarantees validation code will never be generated to equal VALIDATED
+
     def __unicode__(self):
         return self.user.username
 
@@ -1038,8 +1052,33 @@ class UserProfile(models.Model):
             user.save()
     
     #mobile akvo
-    
-    def create_sms_update_workflow(self):
+    def enable_reporting(self, sms_reporter):
+        from dbgp.client import brk
+        brk(host="localhost", port=9000)
+        wa = self.workflow_activity
+        if self.validation == self.VALIDATED:
+            current = wa.current_state()
+            note = __(
+                u'Project %d - "%s" linked for SMS updates by using mobile number %s, sending to %s' % (
+                    sms_reporter.project.id, sms_reporter.project, self.phone_number, sms_reporter.gw_number,
+                )
+            )
+            if current.state == State.objects.get(name__iexact='Phone number validated'):
+                try:
+                    transition = Transition.objects.get(name__iexact="Link project")
+                    wa.progress(transition, self.user, note=note)
+                except Exception, e:
+                    logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+            elif current.state == State.objects.get(name__iexact='Updates enabled'):
+                try:
+                    event = Event.objects.get(name='Project linked')
+                    wa.log_event(event, self.user, note=note)
+                except Exception, e:
+                    logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+            else:
+                logger.exception('UserProfile.enable_reporting() called with bad State: %s Locals:\n %s\n\n' % (current.state, locals(), ))
+        
+    def create_sms_update_workflow(self, wa):
         """
         Called when a phone number is saved to the profile. Sets up a workflow
         for registering a mobile phone with RSR for project updates
@@ -1049,12 +1088,10 @@ class UserProfile(models.Model):
         user = self.user
         # the system account is used for the workflow logging of actions originating in the system itself
         system_acct = User.objects.get(username='system')
-        wf = Workflow.objects.get(slug='sms-update')
-        # the workflowactivity instanciates the workflow
-        wa = WorkflowActivity.objects.create(workflow=wf, created_by=user)
+        self.validation = User.objects.make_random_password(length=6).upper()
         self.workflow_activity = wa
         self.save()
-        wa.save()
+        wa.save() #needed?
         # the system acct needs to be a Particpant to be able to log workflowhistory objects
         assigner = Participant.objects.create(user=system_acct, workflowactivity=wa)
         # set up the user as a partner editor for this project, if possible
@@ -1063,21 +1100,24 @@ class UserProfile(models.Model):
         # now all is set for actually starting the wf!
         wa.start(user)
         # Setup for phone validation
-        validation = User.objects.make_random_password(length=6).upper()
         # TODO: gateway selection!
         gw_number = Gateway.objects.get(name='42it').gatewaynumber_set.all()[0]
-        reporter = SmsReporter.objects.create(userprofile=self, gw_number=gw_number, validation=validation)
+        reporter = SmsReporter.objects.create(userprofile=self, gw_number=gw_number)
         reporter.create_validation_request()
         event = Event.objects.get(name='SMS from gateway')
-        wa.log_event(event, user, note='Sended som SMSes and mailses')
+        wa.log_event(event, user, note='Sent SMS for validation')
+        event = Event.objects.get(name='Email with validation code')
+        wa.log_event(event, user, note='Sent email with validation code')
         return wa    
 
     def create_sms_update(self, mo_sms):
-        logger.debug("Entering: create_sms_update()")
+        logger.debug("Entering: %s()" % who_am_i())
+        from dbgp.client import brk
+        brk(host="localhost", port=9000)
         try:
-            p = SmsReporting.objects.get(userprofile=self, gw_number__number__exact=mo_sms.receiver).project
-        except:
-            logger.exception("Exception trying match an sms to a project. Locals:\n %s\n\n" % locals())
+            p = SmsReporter.objects.get(userprofile=self, gw_number__number__exact=mo_sms.receiver).project
+        except Exception, e:
+            logger.exception("%s. Locals:\n %s\n\n" % (e.message, locals()))
             return False
         update_data = {
             'project': p,
@@ -1089,8 +1129,8 @@ class UserProfile(models.Model):
         }
         try:
             pu = ProjectUpdate.objects.create(**update_data)
-            logger.debug("Created new project update from sms")
-            logger.debug("Exiting: create_sms_update()")
+            logger.debug("Created new project update from sms. ProjectUpdate.id: %d" % pu.pk)
+            logger.debug("Exiting: %s()" % who_am_i())
             return pu
         except:
             logger.exception("Exception when creating an sms project update. Locals:\n %s\n\n" % locals())
@@ -1146,11 +1186,19 @@ class SmsReporter(models.Model):
     """
     Mapping between projects, gateway phone numbers and users phones
     """
-    VALIDATED = 'IS_VALID' # _ guarantees validation code will never be generated to equal VALIDATED
     userprofile = models.ForeignKey(UserProfile)
     gw_number   = models.ForeignKey(GatewayNumber)
     project     = models.ForeignKey(Project, null=True, blank=True, )
-    validation  = models.CharField(_('validation code'), max_length=20)
+    #validation  = models.CharField(_('validation code'), max_length=20)
+    
+    def reporting_enabled(self):
+        profile = self.userprofile
+        extra_context = {
+            'gw_number'     : self.gw_number,
+            'phone_number'  : profile.phone_number,
+            'project'       : self.project,
+        }
+        send_now([profile.user], 'reporting_enabled', extra_context=extra_context, on_site=True)
     
     def create_validation_request(self):
         """
@@ -1158,20 +1206,22 @@ class SmsReporter(models.Model):
         reply to with the code to validate the phone number
         """
         # check we aren't already validated
-        if self.validation != self.VALIDATED:
+        profile = self.userprofile
+        if profile.validation != profile.VALIDATED:
             extra_context = {
                 'gw_number'     : self.gw_number,
-                'validation'    : self.validation,
-                'phone_number'  : self.userprofile.phone_number
+                'validation'    : profile.validation,
+                'phone_number'  : profile.phone_number,
             }
-            send_now([self.userprofile.user], 'phone_added', extra_context=extra_context, on_site=True)
+            send_now([profile.user], 'phone_added', extra_context=extra_context, on_site=True)
 
     def send_confirmation(self):
+        profile = self.userprofile
         extra_context = {
             'gw_number'     : self.gw_number,
-            'phone_number'  : self.userprofile.phone_number
+            'phone_number'  : profile.phone_number
         }
-        send_now([self.userprofile.user], 'phone_confirmed', extra_context=extra_context, on_site=True)
+        send_now([profile.user], 'phone_confirmed', extra_context=extra_context, on_site=True)
 
     class Meta:
         unique_together = ('userprofile', 'gw_number', 'project',)
@@ -1409,4 +1459,3 @@ pre_save.connect(change_name_of_file_on_change, sender=Project)
 pre_save.connect(change_name_of_file_on_change, sender=ProjectUpdate)
 
 post_save.connect(handle_incoming_sms, sender=MoSms)
-post_save.connect(handle_sms_workflow, sender=UserProfile)
