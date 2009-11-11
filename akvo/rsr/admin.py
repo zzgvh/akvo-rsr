@@ -708,7 +708,6 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
     form = UserProfileAdminForm
     inlines = [SmsReporterInline,]
 
-
     #Methods overridden from ModelAdmin (django/contrib/admin/options.py)
 
     def save_formset(self, request, form, formset, change):
