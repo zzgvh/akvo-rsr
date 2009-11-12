@@ -6,6 +6,6 @@
 
 from django.conf.urls.defaults import *
 
-urlpatterns = patterns('gateway.views',
+urlpatterns = patterns('akvo.gateway.views',
     (r'^(?P<gw_name>\w+)/$', 'receive_sms'),
 )

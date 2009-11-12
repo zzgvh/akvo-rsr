@@ -207,7 +207,7 @@ def send_now(users, label, extra_context=None, on_site=True):
                 'message': messages['sms.txt'],
             }, context)
             # extra_context['gw_number'] holds a GatewayNumber object
-            logger.debug("Sending SMS notification of type %S to %s." % (notice_type, user, ))
+            logger.debug("Sending SMS notification of type %s to %s." % (notice_type, user, ))
             extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
 
     # reset environment to original language

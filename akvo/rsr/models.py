@@ -1112,8 +1112,6 @@ class UserProfile(models.Model):
 
     def create_sms_update(self, mo_sms):
         logger.debug("Entering: %s()" % who_am_i())
-        from dbgp.client import brk
-        brk(host="localhost", port=9000)
         try:
             p = SmsReporter.objects.get(userprofile=self, gw_number__number__exact=mo_sms.receiver).project
         except Exception, e:
@@ -1225,6 +1223,9 @@ class SmsReporter(models.Model):
 
     class Meta:
         unique_together = ('userprofile', 'gw_number', 'project',)
+        permissions = (
+            ("%s_smsreporter" % RSR_LIMITED_CHANGE, u'RSR limited change sms reporter'),
+        )
 
 
 class MoMmsRaw(models.Model):

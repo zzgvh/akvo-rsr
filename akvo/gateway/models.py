@@ -58,7 +58,7 @@ class GatewayNumber(models.Model):
     number  = models.CharField(_(u'gateway number'), max_length=30)
     
     def __unicode__(self):
-        return '%s: %s' % (self.gateway, self.number)
+        return self.number
 
     def send_sms(self, mt_number, message):
         send_fields = GW_SENDING_FIELDS_42IT #TODO: generalize to handle any defined gateway

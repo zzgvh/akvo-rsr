@@ -714,8 +714,8 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
         formset.save()
         for initial_form in formset.initial_forms:
             if initial_form.has_changed() and 'project' in initial_form.changed_data:
-                initial_form.instance.reporting_enabled()
                 form.instance.enable_reporting(initial_form.instance)
+                initial_form.instance.reporting_enabled()
         
     def get_form(self, request, obj=None, **kwargs):
         # non-superusers don't get to see it all
