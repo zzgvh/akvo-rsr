@@ -1,7 +1,7 @@
 {% load i18n %}
 {% blocktrans with project.pk as project_pk and project.name as project_name %}Your mobile number, {{phone_number}}, is now enabled to send SMS updates to project {{project_pk}} - {{project_name}}.
 
-Make sure that you send reports to this number: {{gw_number}}. You should have received several SMSs from Akvo with this number but it has not been explicitly linked to this project until now.
+Make sure that you send reports to this number: {{gw_number}}. You should have received at least one SMS from Akvo via this number making replying easy.
 
 
 The Akvo team

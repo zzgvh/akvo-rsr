@@ -950,7 +950,7 @@ class UserProfileManager(models.Manager):
             current = wa.current_state()
             if current.state == State.objects.get(name__iexact='Phone number added'):
                 # look for validation code
-                if profile.validation == mo_sms.message:
+                if profile.validation == mo_sms.message.upper():
                     profile.validation = profile.VALIDATED
                     profile.save()
                     try:
@@ -1050,37 +1050,86 @@ class UserProfile(models.Model):
         if group in user.groups.all():
             user.groups.remove(group)
             user.save()
-    
+
     #mobile akvo
+    def disable_reporting(self, sms_reporter=None):
+        """ Disable SMS reporting for one or all projects linked to a userprofile
+        """
+        wa = self.workflow_activity
+        if self.validation == self.VALIDATED:
+            if sms_reporter:
+                reporters = [sms_reporter]
+            else:
+                reporters = SmsReporter.objects.filter(userprofile=self)
+            for sms_reporter in reporters:
+                note = __(
+                    u'Project %d - "%s" will not accept updates from mobile number %s, via %s any more.' % (
+                        sms_reporter.project.pk, sms_reporter.project, self.phone_number, sms_reporter.gw_number,
+                    )
+                )
+                try:
+                    event = Event.objects.get(name='Project unlinked')
+                    wa.log_event(event, self.user, note=note)
+                    logger.debug('SMS updating cancelled for project: %s Locals:\n %s\n\n' % (sms_reporter.project.pk, locals(), ))
+                    sms_reporter.reporting_cancelled()
+                except Exception, e:
+                    logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+
+    def finish_sms_update_workflow(self):
+        wa = self.workflow_activity
+        current = wa.current_state()
+        try: #choose transition based on current state
+            if current.state == State.objects.get(name__iexact='Phone number added'):
+                transition = Transition.objects.get(name__iexact="Disable updating 1")
+            elif current.state == State.objects.get(name__iexact='Phone number validated'):
+                transition = Transition.objects.get(name__iexact="Disable updating 2")
+            elif current.state == State.objects.get(name__iexact='Updates enabled'):
+                transition = Transition.objects.get(name__iexact="Disable updating 3")
+            else:
+                logger.exception('Error in UserProfileManager.finish_sms_update_workflow: Inconsistent state: %s. Locals:\n %s\n\n' % (current.state, locals()))
+                return
+            self.workflow_activity = None
+            self.validation = None
+            note = __(u'SMS updating is no longer enabled for %s' % self.user.username)
+            wa.progress(transition, self.user, note=note)
+            send_now([self.user], 'phone_disabled', extra_context={'phone_number':self.phone_number}, on_site=True)
+        except Exception, e:
+            logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+
     def enable_reporting(self, sms_reporter):
+        """ Check current state and progress it to Updates enabled if needed or create
+        a log event noting the project linked.
+        Send email and SMS notifying the user about the enabled project
+        """
         wa = self.workflow_activity
         if self.validation == self.VALIDATED:
             current = wa.current_state()
             note = __(
                 u'Project %d - "%s" linked for SMS updates by using mobile number %s, sending to %s' % (
-                    sms_reporter.project.id, sms_reporter.project, self.phone_number, sms_reporter.gw_number,
+                    sms_reporter.project.pk, sms_reporter.project, self.phone_number, sms_reporter.gw_number,
                 )
             )
             if current.state == State.objects.get(name__iexact='Phone number validated'):
                 try:
                     transition = Transition.objects.get(name__iexact="Link project")
                     wa.progress(transition, self.user, note=note)
-                    logger.debug('First project enabled for updating: %s Locals:\n %s\n\n' % (self.smsreporter_set.all()[0].project.pk, locals(), ))
+                    logger.debug('First project enabled for updating: %s Locals:\n %s\n\n' % (sms_reporter.project.pk, locals(), ))
+                    sms_reporter.reporting_enabled()
                 except Exception, e:
                     logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
             elif current.state == State.objects.get(name__iexact='Updates enabled'):
                 try:
                     event = Event.objects.get(name='Project linked')
                     wa.log_event(event, self.user, note=note)
-                    logger.debug('New project enabled for updating: %s Locals:\n %s\n\n' % (self.smsreporter_set.all()[0].project.pk, locals(), ))
+                    logger.debug('New project enabled for updating: %s Locals:\n %s\n\n' % (sms_reporter.project.pk, locals(), ))
+                    sms_reporter.reporting_enabled()
                 except Exception, e:
                     logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
             else:
                 logger.exception('UserProfile.enable_reporting() called with bad State: %s Locals:\n %s\n\n' % (current.state, locals(), ))
         
     def create_sms_update_workflow(self, wa):
-        """
-        Called when a phone number is saved to the profile. Sets up a workflow
+        """ Called when a phone number is saved to the profile. Sets up a workflow
         for registering a mobile phone with RSR for project updates
         """
         # TODO: the start of this method can probably be generalized to a
@@ -1108,9 +1157,12 @@ class UserProfile(models.Model):
         wa.log_event(event, user, note='Sent SMS for validation')
         event = Event.objects.get(name='Email with validation code')
         wa.log_event(event, user, note='Sent email with validation code')
-        return wa    
+        return wa
 
     def create_sms_update(self, mo_sms):
+        """
+        Create a project update from an incoming SMS
+        """
         logger.debug("Entering: %s()" % who_am_i())
         try:
             p = SmsReporter.objects.get(userprofile=self, gw_number__number__exact=mo_sms.receiver).project
@@ -1188,6 +1240,19 @@ class SmsReporter(models.Model):
     gw_number   = models.ForeignKey(GatewayNumber)
     project     = models.ForeignKey(Project, null=True, blank=True, )
     #validation  = models.CharField(_('validation code'), max_length=20)
+    
+    def reporting_cancelled(self):
+        profile = self.userprofile
+        extra_context = {
+            'gw_number'     : self.gw_number,
+            'phone_number'  : profile.phone_number,
+            'project'       : self.project,
+        }
+        send_now([profile.user], 'reporting_cancelled', extra_context=extra_context, on_site=True)
+        try:
+            self.delete()
+        except AssertionError: #self might be deleted already
+            pass
     
     def reporting_enabled(self):
         profile = self.userprofile

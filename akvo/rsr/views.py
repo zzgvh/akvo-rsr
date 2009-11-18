@@ -112,8 +112,6 @@ def index(request):
     soup: the blog entry HTML
     img_src: the url to the first image of the blog entry
     '''
-    #from dbgp.client import brk
-    #brk(host="90.130.213.8", port=9000)
     
     bandwidth = 'low'
     host = 'unknown'
@@ -496,8 +494,6 @@ def update_user_profile(request,
                        ):
     if request.method == 'POST':
         form = form_class(request=request, data=request.POST, files=request.FILES)
-        #from dbgp.client import brk
-        #brk(host="localhost", port=9000)
         if form.is_valid():
             updated_user = form.update(request.user)
             return HttpResponseRedirect(success_url)

@@ -48,8 +48,6 @@ admin.site.register(get_model('rsr', 'country'), CountryAdmin)
 class OrganisationAdminForm(forms.ModelForm):
     pass
     #def save(self, *args, **kwargs):
-    #    from dbgp.client import brk
-    #    brk(host="localhost", port=9000)
     #    foo = super(OrganisationAdminForm, self).save(commit=False, *args, **kwargs)
     #    pass        
 
@@ -77,8 +75,6 @@ class OrganisationAdmin(admin.ModelAdmin):
         super(OrganisationAdmin, self).__init__(model, admin_site)
 
     def queryset(self, request):
-        #from dbgp.client import brk
-        #brk(host="localhost", port=9000)            
         qs = super(OrganisationAdmin, self).queryset(request)
         opts = self.opts
         if request.user.has_perm(opts.app_label + '.' + opts.get_change_permission()):
@@ -463,8 +459,6 @@ class ProjectAdmin(admin.ModelAdmin):
                 #added to make request available for formset.clean()
                 formset.request = request
                 formsets.append(formset)
-            #from dbgp.client import brk
-            #brk(host="localhost", port=9000)            
             if all_valid(formsets) and form_validated:
                 if not new_object.found:
                     form._errors[NON_FIELD_ERRORS] = ErrorList([u'Your org should be apart the partner orgs!'])
@@ -712,10 +706,12 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
 
     def save_formset(self, request, form, formset, change):
         formset.save()
-        for initial_form in formset.initial_forms:
-            if initial_form.has_changed() and 'project' in initial_form.changed_data:
-                form.instance.enable_reporting(initial_form.instance)
-                initial_form.instance.reporting_enabled()
+        for fs_form in formset.forms:
+            if fs_form.has_changed():
+                if 'project' in fs_form.changed_data:
+                    form.instance.enable_reporting(fs_form.instance)
+                elif fs_form.changed_data[0] == "DELETE":
+                    form.instance.disable_reporting(fs_form.instance)
         
     def get_form(self, request, obj=None, **kwargs):
         # non-superusers don't get to see it all
@@ -785,17 +781,20 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
         obj.set_is_org_editor(is_editor) #can edit projects
         obj.set_is_staff(is_admin or is_editor) #implicitly needed to log in to admin
         # workflow for mobile Akvo
-        #from dbgp.client import brk
-        #brk(host="localhost", port=9000)
         if 'phone_number' in form.changed_data:
             if form.cleaned_data['phone_number']:
+                if obj.workflow_activity:
+                    # close previous phone
+                    original = get_model('rsr', 'userprofile').objects.get(pk=obj.pk)
+                    original.disable_reporting()
+                    original.finish_sms_update_workflow()
                 wf = get_model('workflow', 'Workflow').objects.get(slug='sms-update')
                 # the workflowactivity instanciates the workflow
                 wa = get_model('workflow', 'WorkflowActivity').objects.create(workflow=wf, created_by=obj.user)
                 obj.create_sms_update_workflow(wa)
-                
             else: #TODO: number removed, disable sms updting
-                pass
+                obj.disable_reporting()
+                obj.finish_sms_update_workflow()
         obj.save()
 
 admin.site.register(get_model('rsr', 'userprofile'), UserProfileAdmin)

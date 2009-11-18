@@ -16,9 +16,6 @@ def receive_sms(request, gw_name):
     '''
     Handle a callback from a mobile message gateway
     '''
-    #from dbgp.client import brk
-    #brk(host="localhost", port=9000)            
-
     # see if message already has been recieved for some reason, if so ignore
     logger.debug("Entering: receive_sms()")
     try:

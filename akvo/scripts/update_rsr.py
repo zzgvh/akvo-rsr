@@ -42,8 +42,6 @@ def update_organisation_account():
 
 def resave_images(queryset):
     for record in queryset:
-        #from dbgp.client import brk
-        #brk(host="localhost", port=9000)
         opts = record._meta
         for f in opts.fields:
             if type(f).__name__ == 'ImageField' or type(f).__name__ == 'ImageWithThumbnailsField':

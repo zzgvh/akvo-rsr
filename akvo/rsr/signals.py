@@ -113,7 +113,7 @@ def handle_incoming_sms(sender, **kwargs):
         new_sms = kwargs['instance']
         try:
             profile = get_model('rsr', 'UserProfile').objects.process_sms(new_sms)
-        except:
-            logger.exception("Exception trying to match an MoSms to a UserProfile. Locals:\n %s\n\n" % locals())
+        except Exception, e:
+            logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
     logger.debug("Exiting: %s()" % who_am_i())
 
