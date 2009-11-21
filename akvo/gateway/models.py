@@ -150,7 +150,7 @@ class MoSms(models.Model):
         Handle callback from gateway, creating a generic object representing
         an incoming SMS
         """
-        request.encoding = 'iso-8859-1' #TODO: some GWs allow this to be set I think
+        #request.encoding = 'iso-8859-1' #TODO: some GWs allow this to be set I think
         try:
             # if we find an mms already, do nuthin...
             sms, created = MoSms.objects.get(msg_id=request.GET.get(gateway.msg_id)), False

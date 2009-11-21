@@ -18,6 +18,7 @@ from django.db.models import Sum, F
 from django.db.models.query import QuerySet
 from django.db.models.signals import pre_save, post_save
 from django.contrib import admin
+from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import Group, User
 from django.contrib.sites.models import Site
 #from django.core import validators
@@ -54,7 +55,7 @@ from utils import (
 )
 from signals import (
     change_name_of_file_on_change, change_name_of_file_on_create, create_publishing_status,
-    create_organisation_account, handle_incoming_sms, create_paypal_gateway
+    create_organisation_account, handle_incoming_sms, act_on_log_entry, create_paypal_gateway
 )
 
 logger = setup_logging()
@@ -1052,13 +1053,13 @@ class UserProfile(models.Model):
             user.save()
 
     #mobile akvo
-    def disable_reporting(self, sms_reporter=None):
+    def disable_reporting(self, reporter=None):
         """ Disable SMS reporting for one or all projects linked to a userprofile
         """
         wa = self.workflow_activity
         if self.validation == self.VALIDATED:
-            if sms_reporter:
-                reporters = [sms_reporter]
+            if reporter:
+                reporters = [reporter]
             else:
                 reporters = SmsReporter.objects.filter(userprofile=self)
             for sms_reporter in reporters:
@@ -1071,7 +1072,7 @@ class UserProfile(models.Model):
                     event = Event.objects.get(name='Project unlinked')
                     wa.log_event(event, self.user, note=note)
                     logger.debug('SMS updating cancelled for project: %s Locals:\n %s\n\n' % (sms_reporter.project.pk, locals(), ))
-                    sms_reporter.reporting_cancelled()
+                    sms_reporter.reporting_cancelled(set_delete=bool(reporter))
                 except Exception, e:
                     logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
 
@@ -1089,7 +1090,7 @@ class UserProfile(models.Model):
                 logger.exception('Error in UserProfileManager.finish_sms_update_workflow: Inconsistent state: %s. Locals:\n %s\n\n' % (current.state, locals()))
                 return
             self.workflow_activity = None
-            self.validation = None
+            self.validation = ''
             note = __(u'SMS updating is no longer enabled for %s' % self.user.username)
             wa.progress(transition, self.user, note=note)
             send_now([self.user], 'phone_disabled', extra_context={'phone_number':self.phone_number}, on_site=True)
@@ -1239,20 +1240,18 @@ class SmsReporter(models.Model):
     userprofile = models.ForeignKey(UserProfile)
     gw_number   = models.ForeignKey(GatewayNumber)
     project     = models.ForeignKey(Project, null=True, blank=True, )
+ #enabled     = models.BooleanField(default=True)
     #validation  = models.CharField(_('validation code'), max_length=20)
     
-    def reporting_cancelled(self):
+    def reporting_cancelled(self, set_delete=False):
         profile = self.userprofile
+        self.delete = set_delete
         extra_context = {
             'gw_number'     : self.gw_number,
             'phone_number'  : profile.phone_number,
             'project'       : self.project,
         }
         send_now([profile.user], 'reporting_cancelled', extra_context=extra_context, on_site=True)
-        try:
-            self.delete()
-        except AssertionError: #self might be deleted already
-            pass
     
     def reporting_enabled(self):
         profile = self.userprofile
@@ -1525,3 +1524,5 @@ pre_save.connect(change_name_of_file_on_change, sender=Project)
 pre_save.connect(change_name_of_file_on_change, sender=ProjectUpdate)
 
 post_save.connect(handle_incoming_sms, sender=MoSms)
+
+post_save.connect(act_on_log_entry, sender=LogEntry)

@@ -100,15 +100,15 @@ if "workflow" in settings.INSTALLED_APPS:
         }
         workflow1 = create_model_instance(workflow.Workflow, **workflow1_data)
         # State
-        state1_data = {
-            'handle':           {'name': 'Phone number added test'},
-            'description':      'A phone number is added to the UserProfile',
-            'is_start_state':   True,
-            'is_end_state':     False,
-            'workflow':         workflow1,
-            'roles':            role1,
-        }
-        state1 = create_model_instance(workflow.State, **state1_data)
+        #state1_data = {
+        #    'handle':           {'name': 'Phone number added test'},
+        #    'description':      'A phone number is added to the UserProfile',
+        #    'is_start_state':   True,
+        #    'is_end_state':     False,
+        #    'workflow':         workflow1,
+        #    'roles':            role1,
+        #}
+        #state1 = create_model_instance(workflow.State, **state1_data)
 
         
     post_syncdb.connect(create_workflow_objects, sender=notification)

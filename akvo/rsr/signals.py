@@ -7,6 +7,7 @@
 import os
 from datetime import datetime
 
+from django.contrib.auth.models import User
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models import get_model, ImageField
 
@@ -117,3 +118,32 @@ def handle_incoming_sms(sender, **kwargs):
             logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
     logger.debug("Exiting: %s()" % who_am_i())
 
+def cleanup_reporters(profile, user):
+    if not profile.validation == profile.VALIDATED:
+        get_model('rsr', 'smsreporter').objects.filter(userprofile=profile).delete()
+
+from django.contrib.admin.models import ADDITION, CHANGE, DELETION
+from django.contrib.contenttypes.models import ContentType
+
+def act_on_log_entry(sender, **kwargs):
+    """
+    catch the LogEntry post_save to grab newly added Project instances and create
+    a workflow for it
+    we do this at this time to be able to work with a fully populated Project
+    instance with all inline forms processed and their respective objects created
+    """
+    CRITERIA = [
+        {'app': 'rsr', 'model': 'userprofile', 'action': CHANGE, 'call': cleanup_reporters}
+    ]
+    if kwargs.get('created', False):
+        log_entry = kwargs['instance']
+        content_type = ContentType.objects.get(pk=log_entry.content_type_id)
+        if (
+            content_type.app_label == CRITERIA[0]['app']
+            and content_type.model == CRITERIA[0]['model']
+            and log_entry.action_flag == CRITERIA[0]['action']
+        ):
+            user = User.objects.get(pk=log_entry.user_id)
+            object = content_type.get_object_for_this_type(pk=log_entry.object_id)
+            CRITERIA[0]['call'](object, user)
+            

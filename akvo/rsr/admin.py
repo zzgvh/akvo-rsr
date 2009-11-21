@@ -719,7 +719,8 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
             # hide sms-realted stuff
             self.exclude =  ('workflow_activity',)
             # user and org are only shown as text, not select widget
-            self.readonly_fk = ('user', 'organisation',)
+            # validation is also read-only unless you're super
+            self.readonly_fk = ('user', 'organisation', 'validation', )
         # this is needed to remove some kind of caching on exclude and readonly_fk,
         # resulting in the above fields being hidden/changed from superusers after
         # a vanilla user has accessed the form!
@@ -782,19 +783,20 @@ class UserProfileAdmin(ReadonlyFKAdminField, admin.ModelAdmin):
         obj.set_is_staff(is_admin or is_editor) #implicitly needed to log in to admin
         # workflow for mobile Akvo
         if 'phone_number' in form.changed_data:
-            if form.cleaned_data['phone_number']:
+            if form.cleaned_data['phone_number']: # phone number added or changed
                 if obj.workflow_activity:
                     # close previous phone
                     original = get_model('rsr', 'userprofile').objects.get(pk=obj.pk)
                     original.disable_reporting()
                     original.finish_sms_update_workflow()
+                    obj.reset_reporting = True
                 wf = get_model('workflow', 'Workflow').objects.get(slug='sms-update')
-                # the workflowactivity instanciates the workflow
                 wa = get_model('workflow', 'WorkflowActivity').objects.create(workflow=wf, created_by=obj.user)
                 obj.create_sms_update_workflow(wa)
-            else: #TODO: number removed, disable sms updting
+            else: # phone number removed
                 obj.disable_reporting()
                 obj.finish_sms_update_workflow()
+                obj.reset_reporting = True
         obj.save()
 
 admin.site.register(get_model('rsr', 'userprofile'), UserProfileAdmin)

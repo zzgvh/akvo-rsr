@@ -94,3 +94,4 @@ akvo/datadir_bu
 *.kpf
 akvo/testing.py
 akvo/rebuild_db.py
+datadir_old
