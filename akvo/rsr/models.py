@@ -18,6 +18,7 @@ from django.db.models import Sum, F
 from django.db.models.query import QuerySet
 from django.db.models.signals import pre_save, post_save
 from django.contrib import admin
+from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import Group, User
 from django.contrib.sites.models import Site
 #from django.core import validators
@@ -26,21 +27,39 @@ from django.template import loader, Context
 from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import ugettext as __
 
 from mollie.ideal.utils import get_mollie_banklist
 from paypal.standard.ipn.signals import payment_was_flagged
 from registration.models import RegistrationProfile, RegistrationManager
 from sorl.thumbnail.fields import ImageWithThumbnailsField
+from  workflow.models import (
+    Workflow, WorkflowActivity, WorkflowHistory, Participant, Event, Role,
+    State, Transition, workflow_started, workflow_transitioned
+)
+
+from akvo.gateway.models import Gateway, GatewayNumber, MoSms
+
 from akvo.settings import MEDIA_ROOT
 
-from utils import (GROUP_RSR_EDITORS, RSR_LIMITED_CHANGE, GROUP_RSR_PARTNER_ADMINS,
-				   GROUP_RSR_PARTNER_EDITORS)
-from utils import (PAYPAL_INVOICE_STATUS_PENDING, PAYPAL_INVOICE_STATUS_VOID,
-				   PAYPAL_INVOICE_STATUS_COMPLETE, PAYPAL_INVOICE_STATUS_STALE)
-from utils import groups_from_user, rsr_image_path, rsr_send_mail_to_users, qs_column_sum
-from signals import (change_name_of_file_on_change, change_name_of_file_on_create,
-    create_publishing_status, create_organisation_account,
-    create_payment_gateway_selector, donation_completed)
+from utils import (
+    GROUP_RSR_EDITORS, RSR_LIMITED_CHANGE, GROUP_RSR_PARTNER_ADMINS, GROUP_RSR_PARTNER_EDITORS
+)
+from utils import (
+    PAYPAL_INVOICE_STATUS_PENDING, PAYPAL_INVOICE_STATUS_VOID,
+    PAYPAL_INVOICE_STATUS_COMPLETE, PAYPAL_INVOICE_STATUS_STALE
+)
+from utils import (
+    groups_from_user, rsr_image_path, rsr_send_mail_to_users, qs_column_sum,
+    setup_logging, who_am_i, send_now
+)
+from signals import (
+    change_name_of_file_on_change, change_name_of_file_on_create, create_publishing_status,
+    create_organisation_account, handle_incoming_sms, act_on_log_entry, create_paypal_gateway,
+    create_payment_gateway_selector, donation_completed,
+)
+
+logger = setup_logging()
 
 #Custom manager
 #based on http://www.djangosnippets.org/snippets/562/ and
@@ -929,8 +948,6 @@ class FieldPartner(models.Model):
     #    def __unicode__(self):
     #        return self.project.__unicode__()
 
-
-        
 PHOTO_LOCATIONS = (
     ('B', _('At the beginning of the update')),
     ('E', _('At the end of the update')),
@@ -946,27 +963,58 @@ UPDATE_METHODS = (
 def isValidGSMnumber(field_data, all_data):
     #TODO: fix for django 1.0
     pass
-	#if not field_data.startswith("467"):
-	#	raise validators.ValidationError("The phone number must start with 467")
-	#if not len(field_data) == 11:
-	#	raise validators.ValidationError("The phone number must be 11 digits long.")
+    #if not field_data.startswith("467"):
+    #	raise validators.ValidationError("The phone number must start with 467")
+    #if not len(field_data) == 11:
+    #	raise validators.ValidationError("The phone number must be 11 digits long.")
+
+class UserProfileManager(models.Manager):
+    def process_sms(self, mo_sms):
+        profile = self.get(phone_number__exact=mo_sms.sender)
+        wa = profile.workflow_activity
+        if wa:
+            current = wa.current_state()
+            if current.state == State.objects.get(name__iexact='Phone number added'):
+                # look for validation code
+                if profile.validation == mo_sms.message.upper():
+                    profile.validation = profile.VALIDATED
+                    profile.save()
+                    try:
+                        transition = Transition.objects.get(name__iexact="Validate phone number")
+                        note = __(u'Phone number %s validated for %s' % (profile.phone_number, profile.user.username))
+                        wa.progress(transition, profile.user, note=note)
+                    except Exception, e:
+                        logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+                else:
+                    logger.exception('Error in UserProfileManager.process_sms: "%s" is not the correct validation code expected "%s". Locals:\n %s\n\n' % (mo_sms.message, profile.validation, locals()))
+            elif current.state == State.objects.get(name__iexact='Phone number validated'):
+                # we shouldn't be here...phone ok, but no project selected :(
+                logger.exception('Error in UserProfileManager.process_sms: WA in state "Phone number validated" meaning phone is validated, but no project has been selected. Locals:\n %s\n\n' % (mo_sms.message, profile.validation, locals()))
+            elif current.state == State.objects.get(name__iexact='Updates enabled'):
+                # time to make an SMS update!
+                profile.create_sms_update(mo_sms)
+            else:
+                pass
+        else:
+            raise("UserProfileManager error: No WorkflowActivity to handle incoming SMS")
+
+    
+ROLE_SMS_UPDATER = u'SMS Updater'
 
 class UserProfile(models.Model):
     '''
     Extra info about a user.
     '''
     user            = models.OneToOneField(User)
-    organisation    = models.ForeignKey(Organisation)
-    phone_number    = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text=_("""Please use the following format: <strong>467XXXXXXXX</strong>.
-        <br>Example: the number 070 765 43 21 would be entered as 46707654321"""),
-        #TODO: fix to django 1.0
-        #validator_list = [isValidGSMnumber]
-    )    
-    #project         = models.ForeignKey(Project, null=True, blank=True, )
+    organisation        = models.ForeignKey(Organisation)
+    phone_number        = models.CharField(max_length=50, blank=True,)# TODO: check uniqueness if non-empty
+    validation          = models.CharField(_('validation code'), max_length=20, blank=True,)
+    workflow_activity	= models.OneToOneField(WorkflowActivity, related_name='wf_object', null=True, blank=True,)
+
+    objects         = UserProfileManager()
     
+    VALIDATED = 'IS_VALID' # _ in IS_VALID guarantees validation code will never be generated to equal VALIDATED
+
     def __unicode__(self):
         return self.user.username
 
@@ -1032,40 +1080,176 @@ class UserProfile(models.Model):
         if group in user.groups.all():
             user.groups.remove(group)
             user.save()
-    
-    #mobile akvo
 
-    def create_sms_update(self, mo_sms_raw):
-        # does the user have a project to update? TODO: security!
-        if self.project:
-            update_data = {
-                'project': self.project,
-                'user': self.user,
-                'title': 'SMS update',
-                'update_method': 'S',
-                'text': mo_sms_raw.text,
-                'time': datetime.fromtimestamp(float(mo_sms_raw.delivered)),
-            }
-            #update_data.update(sms_data)
-            pu = ProjectUpdate.objects.create(**update_data)
-            return pu
-        return False
+    def my_projects(self):
+        return self.organisation.all_projects()
         
-    def create_mms_update(self, mo_mms_raw):
-        # does the user have a project to update? TODO: security!
-        if self.project:
-            update_data = {
-                'project': self.project,
-                'user': self.user,
-                'title': mo_mms_raw.subject,
-                'update_method': 'S',
-                'time': datetime.fromtimestamp(float(mo_mms_raw.time)),
-            }
-            attachements = mo_mms_raw.get_mms_files()
-            update_data.update(attachements)
+    def my_reporters(self):
+        return SmsReporter.objects.filter(userprofile=self)
+
+    #mobile akvo
+    
+    def create_reporter(self, project):
+        """ Create a new SMSReporter object with a gateway number that is currently not in use
+        """
+        gw = Gateway.objects.get(name='42it')
+        numbers = GatewayNumber.objects.filter(gateway=gw).exclude(number__in=[r.gw_number.number for r in self.reporters.all()])
+        if numbers:
+            new_number = numbers[0]
+            reporter = SmsReporter.objects.create(userprofile=self, project=project, gw_number=new_number)
+        
+        
+    def disable_reporting(self, reporter=None):
+        """ Disable SMS reporting for one or all projects linked to a userprofile
+        """
+        wa = self.workflow_activity
+        if self.validation == self.VALIDATED:
+            if reporter:
+                reporters = [reporter]
+            else:
+                reporters = SmsReporter.objects.filter(userprofile=self)
+            for sms_reporter in reporters:
+                note = __(
+                    u'Project %d - "%s" will not accept updates from mobile number %s, via %s any more.' % (
+                        sms_reporter.project.pk, sms_reporter.project, self.phone_number, sms_reporter.gw_number,
+                    )
+                )
+                try:
+                    event = Event.objects.get(name='Project unlinked')
+                    wa.log_event(event, self.user, note=note)
+                    logger.debug('SMS updating cancelled for project: %s Locals:\n %s\n\n' % (sms_reporter.project.pk, locals(), ))
+                    sms_reporter.reporting_cancelled(set_delete=bool(reporter))
+                except Exception, e:
+                    logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+
+    def finish_sms_update_workflow(self):
+        wa = self.workflow_activity
+        current = wa.current_state()
+        try: #choose transition based on current state
+            if current.state == State.objects.get(name__iexact='Phone number added'):
+                transition = Transition.objects.get(name__iexact="Disable updating 1")
+            elif current.state == State.objects.get(name__iexact='Phone number validated'):
+                transition = Transition.objects.get(name__iexact="Disable updating 2")
+            elif current.state == State.objects.get(name__iexact='Updates enabled'):
+                transition = Transition.objects.get(name__iexact="Disable updating 3")
+            else:
+                logger.exception('Error in UserProfileManager.finish_sms_update_workflow: Inconsistent state: %s. Locals:\n %s\n\n' % (current.state, locals()))
+                return
+            self.workflow_activity = None
+            self.validation = ''
+            note = __(u'SMS updating is no longer enabled for %s' % self.user.username)
+            wa.progress(transition, self.user, note=note)
+            send_now([self.user], 'phone_disabled', extra_context={'phone_number':self.phone_number}, on_site=True)
+        except Exception, e:
+            logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+
+    def enable_reporting(self, sms_reporter):
+        """ Check current state and progress it to Updates enabled if needed or create
+        a log event noting the project linked.
+        Send email and SMS notifying the user about the enabled project
+        """
+        wa = self.workflow_activity
+        if self.validation == self.VALIDATED:
+            current = wa.current_state()
+            note = __(
+                u'Project %d - "%s" linked for SMS updates by using mobile number %s, sending to %s' % (
+                    sms_reporter.project.pk, sms_reporter.project, self.phone_number, sms_reporter.gw_number,
+                )
+            )
+            if current.state == State.objects.get(name__iexact='Phone number validated'):
+                try:
+                    transition = Transition.objects.get(name__iexact="Link project")
+                    wa.progress(transition, self.user, note=note)
+                    logger.debug('First project enabled for updating: %s Locals:\n %s\n\n' % (sms_reporter.project.pk, locals(), ))
+                    sms_reporter.reporting_enabled()
+                except Exception, e:
+                    logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+            elif current.state == State.objects.get(name__iexact='Updates enabled'):
+                try:
+                    event = Event.objects.get(name='Project linked')
+                    wa.log_event(event, self.user, note=note)
+                    logger.debug('New project enabled for updating: %s Locals:\n %s\n\n' % (sms_reporter.project.pk, locals(), ))
+                    sms_reporter.reporting_enabled()
+                except Exception, e:
+                    logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))
+            else:
+                logger.exception('UserProfile.enable_reporting() called with bad State: %s Locals:\n %s\n\n' % (current.state, locals(), ))
+        
+    def create_sms_update_workflow(self, wa):
+        """ Called when a phone number is saved to the profile. Sets up a workflow
+        for registering a mobile phone with RSR for project updates
+        """
+        # TODO: the start of this method can probably be generalized to a
+        # create_FOO_workflow() call returning the wa for special handling
+        user = self.user
+        # the system account is used for the workflow logging of actions originating in the system itself
+        system_acct = User.objects.get(username='system')
+        self.validation = User.objects.make_random_password(length=6).upper()
+        self.workflow_activity = wa
+        self.save()
+        wa.save() #needed?
+        # the system acct needs to be a Particpant to be able to log workflowhistory objects
+        assigner = Participant.objects.create(user=system_acct, workflowactivity=wa)
+        # set up the user as a partner editor for this project, if possible
+        sms_updater = Role.objects.get(name=ROLE_SMS_UPDATER)
+        wa.assign_role(system_acct, user, sms_updater)
+        # now all is set for actually starting the wf!
+        wa.start(user)
+        # Setup for phone validation
+        # TODO: gateway selection!
+        gw_number = Gateway.objects.get(name='42it').gatewaynumber_set.all()[0]
+        reporter = SmsReporter.objects.create(userprofile=self, gw_number=gw_number)
+        reporter.create_validation_request()
+        event = Event.objects.get(name='SMS from gateway')
+        wa.log_event(event, user, note='Sent SMS for validation')
+        event = Event.objects.get(name='Email with validation code')
+        wa.log_event(event, user, note='Sent email with validation code')
+        return wa
+
+    def create_sms_update(self, mo_sms):
+        """
+        Create a project update from an incoming SMS
+        """
+        logger.debug("Entering: %s()" % who_am_i())
+        try:
+            p = SmsReporter.objects.get(userprofile=self, gw_number__number__exact=mo_sms.receiver).project
+        except Exception, e:
+            logger.exception("%s. Locals:\n %s\n\n" % (e.message, locals()))
+            return False
+        update_data = {
+            'project': p,
+            'user': self.user,
+            'title': 'SMS update',
+            'update_method': 'S',
+            'text': mo_sms.message,
+            'time': mo_sms.saved_at,
+        }
+        try:
             pu = ProjectUpdate.objects.create(**update_data)
+            logger.debug("Created new project update from sms. ProjectUpdate.id: %d" % pu.pk)
+            logger.debug("Exiting: %s()" % who_am_i())
             return pu
-        return False
+        except:
+            logger.exception("Exception when creating an sms project update. Locals:\n %s\n\n" % locals())
+            return False
+
+    # needs re-visit        
+    #def create_mms_update(self, mo_mms_raw):
+    #    # does the user have a project to update? TODO: security!
+    #    if self.project:
+    #        update_data = {
+    #            'project': self.project,
+    #            'user': self.user,
+    #            'title': mo_mms_raw.subject,
+    #            'update_method': 'S',
+    #            'time': datetime.fromtimestamp(float(mo_mms_raw.time)),
+    #        }
+    #        attachements = mo_mms_raw.get_mms_files()
+    #        update_data.update(attachements)
+    #        pu = ProjectUpdate.objects.create(**update_data)
+    #        return pu
+    #    return False
+
 
     class Meta:
         permissions = (
@@ -1093,6 +1277,67 @@ user_activated.connect(user_activated_callback)
 
 def create_rsr_profile(user, profile):
     return UserProfile.objects.create(user=user, organisation=Organisation.objects.get(pk=profile['org_id']))
+
+
+class SmsReporter(models.Model):
+    """
+    Mapping between projects, gateway phone numbers and users phones
+    """
+    userprofile = models.ForeignKey(UserProfile, related_name='reporters')
+    gw_number   = models.ForeignKey(GatewayNumber)
+    project     = models.ForeignKey(Project, null=True, blank=True, )
+    
+    #def __init__(self, *args, **kwargs):
+    #    from dbgp.client import brk
+    #    brk(host="localhost", port=9000)
+    
+    def reporting_cancelled(self, set_delete=False):
+        profile = self.userprofile
+        #self.delete = set_delete
+        extra_context = {
+            'gw_number'     : self.gw_number,
+            'phone_number'  : profile.phone_number,
+            'project'       : self.project,
+        }
+        send_now([profile.user], 'reporting_cancelled', extra_context=extra_context, on_site=True)
+    
+    def reporting_enabled(self):
+        profile = self.userprofile
+        extra_context = {
+            'gw_number'     : self.gw_number,
+            'phone_number'  : profile.phone_number,
+            'project'       : self.project,
+        }
+        send_now([profile.user], 'reporting_enabled', extra_context=extra_context, on_site=True)
+    
+    def create_validation_request(self):
+        """
+        send validation code through email and an SMS that the user can easily
+        reply to with the code to validate the phone number
+        """
+        # check we aren't already validated
+        profile = self.userprofile
+        if profile.validation != profile.VALIDATED:
+            extra_context = {
+                'gw_number'     : self.gw_number,
+                'validation'    : profile.validation,
+                'phone_number'  : profile.phone_number,
+            }
+            send_now([profile.user], 'phone_added', extra_context=extra_context, on_site=True)
+
+    def send_confirmation(self):
+        profile = self.userprofile
+        extra_context = {
+            'gw_number'     : self.gw_number,
+            'phone_number'  : profile.phone_number
+        }
+        send_now([profile.user], 'phone_confirmed', extra_context=extra_context, on_site=True)
+
+    class Meta:
+        unique_together = ('userprofile', 'gw_number', 'project',)
+        permissions = (
+            ("%s_smsreporter" % RSR_LIMITED_CHANGE, u'RSR limited change sms reporter'),
+        )
 
 
 class MoMmsRaw(models.Model):
@@ -1372,3 +1617,6 @@ pre_save.connect(change_name_of_file_on_change, sender=Organisation)
 pre_save.connect(change_name_of_file_on_change, sender=Project)
 pre_save.connect(change_name_of_file_on_change, sender=ProjectUpdate)
 
+post_save.connect(handle_incoming_sms, sender=MoSms)
+
+post_save.connect(act_on_log_entry, sender=LogEntry)

@@ -93,11 +93,15 @@ akvo/mediaroot/img/paypal_donate_old.gif
 akvo/datadir_bu
 *.kpf
 akvo/testing.py
+<<<<<<< TREE
 scripts/static_project_structure.py
 akvo/datadir.zip
 akvo/datadir_ori
 akvo/datadir_virgin
+=======
+>>>>>>> MERGE-SOURCE
 akvo/rebuild_db.py
+<<<<<<< TREE
 akvo/rsr_data.json
 akvo/templates/inclusion_tags/foo.html
 akvo/templates/inclusion_tags/project_map.html
@@ -105,3 +109,8 @@ akvo/settings.py
 settings.pyc
 settings.py
 
+=======
+datadir_old
+akvo/datadir_fixture
+akvo/datadir_fixture.zip
+>>>>>>> MERGE-SOURCE
