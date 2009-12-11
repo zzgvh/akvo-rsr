@@ -1,1 +1,1 @@
-../../static/settings.py
+../../static/settings_sms_workflow.py
