@@ -4,40 +4,66 @@
 # See more details in the license.txt file located at the root folder of the Akvo RSR module. 
 # For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
 
-from akvo.rsr.models import Organisation, Project, ProjectUpdate, ProjectComment, FundingPartner, MoSmsRaw, PHOTO_LOCATIONS, STATUSES, UPDATE_METHODS
-from akvo.rsr.models import UserProfile, MoMmsRaw, MoMmsFile, Invoice
-from akvo.rsr.forms import InvoiceForm, OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm# , RSR_RegistrationForm, RSR_PasswordChangeForm, RSR_AuthenticationForm, RSR_RegistrationProfile
-from akvo.rsr.decorators import fetch_project
+# === django imports === #
+from django import forms, http
 
-from django import forms
-from django import http
 from django.conf import settings
+
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm, PasswordResetForm, SetPasswordForm, PasswordChangeForm
+from django.contrib.auth.forms import (
+    AuthenticationForm, PasswordResetForm, SetPasswordForm, PasswordChangeForm
+)
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.core.urlresolvers import reverse
+
 from django.forms import ModelForm
+
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseServerError
+
 from django.shortcuts import render_to_response, get_object_or_404, redirect
+
 from django.template import Context, RequestContext, loader
+
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
+
 from django.views.decorators.http import require_GET, require_POST
 
-from BeautifulSoup import BeautifulSoup
+# === std lib imports === #
 from datetime import datetime
 import time
-import feedparser
-from registration.models import RegistrationProfile
 import random
 from decimal import Decimal
 
-from mollie.ideal.utils import query_mollie
+
+# === packages imports === #
+import feedparser
+from BeautifulSoup import BeautifulSoup
+from registration.models import RegistrationProfile
 from paypal.standard.forms import PayPalPaymentsForm
+from mollie.ideal.utils import query_mollie
+
+# === rsr imports === #
+from decorators import fetch_project
+
+from forms import (
+    InvoiceForm, OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm, UpdateForm
+)
+
+from models import (
+    Organisation, Project, ProjectUpdate, ProjectComment, FundingPartner,
+    MoSmsRaw, PHOTO_LOCATIONS, STATUSES, UPDATE_METHODS, UserProfile, MoMmsRaw,
+    MoMmsFile, Invoice, SmsReporter
+)
+
+from utils import setup_logging
+
+logger = setup_logging()
 
 REGISTRATION_RECEIVERS = ['gabriel@akvo.org', 'thomas@akvo.org', 'beth@akvo.org']
 
@@ -98,8 +124,6 @@ def index(request):
     soup: the blog entry HTML
     img_src: the url to the first image of the blog entry
     '''
-    #from dbgp.client import brk
-    #brk(host="90.130.213.8", port=9000)
     
     bandwidth = 'low'
     host = 'unknown'
@@ -525,7 +549,7 @@ def update_user_profile(request,
                         extra_context=None
                        ):
     if request.method == 'POST':
-        form = form_class(data=request.POST, files=request.FILES)
+        form = form_class(request=request, data=request.POST, files=request.FILES)
         if form.is_valid():
             updated_user = form.update(request.user)
             return HttpResponseRedirect(success_url)
@@ -533,6 +557,7 @@ def update_user_profile(request,
         form = form_class(initial={
             'first_name':request.user.first_name,
             'last_name':request.user.last_name,
+            'phone_number':request.user.get_profile().phone_number,
         })
     if extra_context is None:
         extra_context = {}
@@ -567,24 +592,6 @@ def projectcomments(request, project_id):
     form        = CommentForm()
     return {'p': p, 'comments': comments, 'form': form, }
 
-class UpdateForm(ModelForm):
-
-    js_snippet = "return taCount(this,'myCounter')"
-    js_snippet = mark_safe(js_snippet)    
-    title           = forms.CharField(
-                        widget=forms.TextInput(
-                            attrs={'class':'input', 'maxlength':'50', 'size':'25', 'onKeyPress':'return taLimit(this)', 'onKeyUp':js_snippet}
-                      ))
-    text            = forms.CharField(required=False, widget=forms.Textarea(attrs={'class':'textarea', 'cols':'50'}))
-    #status          = forms.CharField(widget=forms.RadioSelect(choices=STATUSES, attrs={'class':'radio'}))
-    photo           = forms.ImageField(required=False, widget=forms.FileInput(attrs={'class':'input', 'size':'15', 'style':'height: 2em'}))
-    photo_location  = forms.CharField(required=False, widget=forms.RadioSelect(choices=PHOTO_LOCATIONS, attrs={'class':'radio'}))
-    photo_caption   = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'75',}))
-    photo_credit    = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'25',}))
-    
-    class Meta:
-        model = ProjectUpdate
-        exclude = ('time', 'project', 'user', )
 
 @login_required()
 def updateform(request, project_id):
@@ -613,6 +620,45 @@ def updateform(request, project_id):
     else:
         form = UpdateForm()
     return render_to_response('rsr/update_form.html', {'form': form, 'p': p, }, RequestContext(request))
+
+class MobileForm(forms.Form):
+    phone_number    = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'15',}))
+    project         = forms.ChoiceField(required=False, widget=forms.Select())
+
+    def __init__(self, *args, **kwargs):
+        profile = kwargs.pop('profile', None)
+        forms.Form.__init__(self, *args, **kwargs)
+        if profile:
+            self.fields['project'].choices = ((u'', u'---------'),) + tuple([(p.id, "%s - %s" % (unicode(p.pk), p.name)) for p in profile.my_projects()])
+            
+@login_required()
+def myakvo_mobile(request):
+    '''
+    '''
+    profile = request.user.get_profile()
+    reporters = profile.my_reporters()
+    form_data = {'phone_number': profile.phone_number}
+    if request.method == 'POST':
+        form = MobileForm(request.POST, request.FILES, profile=profile)
+        if form.is_valid():
+            project = Project.objects.get(pk=form.cleaned_data['project'])
+            profile.create_reporter(project)
+            reporters = profile.my_reporters()
+            return HttpResponseRedirect('./')
+    else:
+        form = MobileForm(form_data,profile=profile)
+    return render_to_response('myakvo/mobile.html', {'form': form, 'reporters': reporters, }, RequestContext(request))
+
+@login_required()
+def cancel_reporter(request, reporter_id):
+    '''
+    '''
+    profile = request.user.get_profile()
+    reporter = SmsReporter.objects.get(id=reporter_id)
+    profile.disable_reporting(reporter)
+    reporter.delete()
+    return HttpResponseRedirect(reverse('myakvo_mobile'))
+    
 
 def mms_update(request):
     '''
@@ -681,7 +727,7 @@ def sms_update(request):
             pass #TODO: logging!
     return HttpResponse("OK") #return OK under all conditions
 
-class CommentForm(ModelForm):
+class CommentForm(forms.ModelForm):
 
     comment     = forms.CharField(widget=forms.Textarea(attrs={
                                     'class':'textarea',

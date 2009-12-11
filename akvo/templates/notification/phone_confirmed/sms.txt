@@ -1,0 +1,2 @@
+{% load i18n %}
+{% blocktrans %}Your phone is now confirmed for use updating projects in Akvo.{% endblocktrans %}

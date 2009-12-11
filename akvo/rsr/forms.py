@@ -24,7 +24,7 @@ from registration.forms import RegistrationFormUniqueEmail
 
 from mollie.ideal.utils import get_mollie_banklist
 
-from akvo.rsr.models import (UserProfile, Organisation, Project,)
+from models import (UserProfile, Organisation, Project, ProjectUpdate, PHOTO_LOCATIONS)
 
 # I put this on all required fields, because it's easier to pick up
 # on them with CSS or JavaScript if they have a class of "required"
@@ -176,17 +176,58 @@ class RSR_RegistrationFormUniqueEmail(RegistrationFormUniqueEmail):
         UserProfile.objects.create(user=new_user, organisation=Organisation.objects.get(pk=self.cleaned_data['org_id']))
         return new_user
 
+
+class UpdateForm(forms.ModelForm):
+
+    js_snippet = "return taCount(this,'myCounter')"
+    js_snippet = mark_safe(js_snippet)    
+    title           = forms.CharField(
+                        widget=forms.TextInput(
+                            attrs={'class':'input', 'maxlength':'50', 'size':'25', 'onKeyPress':'return taLimit(this)', 'onKeyUp':js_snippet}
+                      ))
+    text            = forms.CharField(required=False, widget=forms.Textarea(attrs={'class':'textarea', 'cols':'50'}))
+    #status          = forms.CharField(widget=forms.RadioSelect(choices=STATUSES, attrs={'class':'radio'}))
+    photo           = forms.ImageField(required=False, widget=forms.FileInput(attrs={'class':'input', 'size':'15', 'style':'height: 2em'}))
+    photo_location  = forms.CharField(required=False, widget=forms.RadioSelect(choices=PHOTO_LOCATIONS, attrs={'class':'radio'}))
+    photo_caption   = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'75',}))
+    photo_credit    = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'25',}))
+    
+    class Meta:
+        model = ProjectUpdate
+        exclude = ('time', 'project', 'user', )
+        
+
 class RSR_ProfileUpdateForm(forms.Form):
 
-    first_name  = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
-    last_name   = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
-    #phone_number   = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
+    first_name      = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
+    last_name       = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
+    phone_number    = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict), required=False)
     #organisation   = forms.CharField(max_length=30, widget=forms.TextInput(attrs=attrs_dict))
 
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request') if kwargs.get('request') else None
+        super(RSR_ProfileUpdateForm, self).__init__(*args, **kwargs)
+
+    def clean_phone_number(self):
+        # TODO: validate phone number format
+        data = self.cleaned_data['phone_number']
+        if data:
+            try:
+                profile = UserProfile.objects.get(phone_number=data)
+            except:
+                return data
+            if profile != self.request.user.get_profile():
+                raise forms.ValidationError(_(u'Phone number is not unique!'))
+        return data
+        
     def update(self, user):
         user.first_name = self.cleaned_data['first_name']
         user.last_name  = self.cleaned_data['last_name']
-        user.save()        
+        user.save()
+        if self.cleaned_data.get('phone_number'):
+            up = user.get_profile()
+            up.phone_number = self.cleaned_data['phone_number']
+            up.save()
         return user
 
 class RSR_SetPasswordForm(SetPasswordForm):
