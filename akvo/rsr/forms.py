@@ -22,7 +22,7 @@ from django.utils.translation import ugettext_lazy as _
 from registration.models import RegistrationProfile
 from registration.forms import RegistrationFormUniqueEmail
 
-from akvo.rsr.models import (UserProfile, Organisation, Project,)
+from models import (UserProfile, Organisation, Project, ProjectUpdate, PHOTO_LOCATIONS)
 
 # I put this on all required fields, because it's easier to pick up
 # on them with CSS or JavaScript if they have a class of "required"
@@ -173,6 +173,27 @@ class RSR_RegistrationFormUniqueEmail(RegistrationFormUniqueEmail):
         new_user.save()
         UserProfile.objects.create(user=new_user, organisation=Organisation.objects.get(pk=self.cleaned_data['org_id']))
         return new_user
+
+
+class UpdateForm(forms.ModelForm):
+
+    js_snippet = "return taCount(this,'myCounter')"
+    js_snippet = mark_safe(js_snippet)    
+    title           = forms.CharField(
+                        widget=forms.TextInput(
+                            attrs={'class':'input', 'maxlength':'50', 'size':'25', 'onKeyPress':'return taLimit(this)', 'onKeyUp':js_snippet}
+                      ))
+    text            = forms.CharField(required=False, widget=forms.Textarea(attrs={'class':'textarea', 'cols':'50'}))
+    #status          = forms.CharField(widget=forms.RadioSelect(choices=STATUSES, attrs={'class':'radio'}))
+    photo           = forms.ImageField(required=False, widget=forms.FileInput(attrs={'class':'input', 'size':'15', 'style':'height: 2em'}))
+    photo_location  = forms.CharField(required=False, widget=forms.RadioSelect(choices=PHOTO_LOCATIONS, attrs={'class':'radio'}))
+    photo_caption   = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'75',}))
+    photo_credit    = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'25',}))
+    
+    class Meta:
+        model = ProjectUpdate
+        exclude = ('time', 'project', 'user', )
+        
 
 class RSR_ProfileUpdateForm(forms.Form):
 

@@ -1,0 +1,127 @@
+{% extends "rsr/index_base.html" %}
+
+{% comment %}
+Akvo RSR is covered by the GNU Affero General Public License, see more details in the license.txt file located at the root folder of the Akvo RSR module. 
+For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
+{% endcomment %}
+
+{% load i18n generic_content addparam rsr_tags thumbnail %}
+
+{% block title %}
+	{% trans 'MyAkvo - Mobile' %}
+{% endblock title %}
+
+{% block style %}
+	{{block.super}}
+	<link rel="stylesheet" type="text/css" href="{{MEDIA_URL}}css/march.css" media="screen" />
+	<meta http-equiv="pragma" content="no-cache"/>
+	<meta http-equiv="cache-control" content="no-cache"/>
+{% endblock style%}
+
+{% block breadcrumbs %}
+	{{block.super}} &raquo; {% trans 'MyAkvo - Mobile' %}
+{% endblock breadcrumbs %}
+
+{% block page_id %}
+<div id="page_workflow">
+{% endblock page_id %}
+
+{% block outer_leftwing %}
+
+<div id="outer_leftwing" style="margin-bottom:20px; width: 650px;">
+	<form method="post">
+	<div style="clear: left;width: 650px;" class="clearfix">
+	
+			<div class="boxhead">
+				<h1>{% trans 'Use Akvo RSR with text messaging' %}</h1>
+			</div> <!-- .boxhead -->
+            <div class="boxbody" style="padding-left:20px;">
+
+                Send updates from your mobile phone to projects in Akvo
+
+                <table border="0" cellspacing="0" cellpadding="0"> 
+                    <tr>
+                        <td class="lightx2" style="font-weight: bold; vertical-align: middle;">
+                            Mobile phone number
+                        </td>
+                        <td style="vertical-align: middle;">{{form.phone_number}}</td>
+                    </tr>
+                    {% for r in reporters %}
+                    <tr style="background:{% cycle "#FFFFFF" "#F3F3F3" %};">
+                        <td class="lightx2" style="font-weight: bold; vertical-align: middle;">
+                            Project to update
+                        </td>
+                        <td style="vertical-align: middle;">{{r.project.pk}} - {{r.project.name}} <a href="{% url cancel_reporter r.id %}">Stop updating</a></td>
+                    </tr>
+                    <tr style="background:{% cycle "#FFFFFF" "#F3F3F3" %};">
+                        <td class="lightx2" style="font-weight: bold; vertical-align: middle;">
+                            Number for project</td>
+                        <td style="vertical-align: middle;">{{r.gw_number}}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <td class="lightx2" style="font-weight: bold; vertical-align: middle;">
+                            Add a project
+                        </td>
+                        <td style="vertical-align: middle;">{{form.project}}</td>
+                    </tr>
+        
+                </table>                    
+
+				<input type="submit" value="Add">
+			</div>
+	</div>
+	</form>
+	
+
+		<div class="boxbody">
+			<table border="0" cellspacing="0" cellpadding="0"> 
+				<tr class="bold hr">
+					<td>
+						Workflow
+					</td>
+					<td>
+						Project
+					</td>
+					<td>
+						State
+					</td>
+					<td>
+						Role(s)
+					</td>
+					<td>
+						Action(s)
+					</td>
+				</tr>
+			</table>
+		</div>
+</div> <!-- #outer_leftwing -->
+{% endblock outer_leftwing %}
+
+{% block outer_rightwing %}
+<div id="outer_rightwing" style="width: 300px;">
+	<div class="boxhead">
+		<a class="actionbutton ab_grey" href=""><span>{% trans 'Admin' %}</span></a>						
+		<h1>{% trans 'Inbox' %}</h1>
+	</div> <!-- .boxhead -->
+	<div class="boxbody">
+
+			<a style="padding-left:20px;" href="{% url notification_mark_all_seen %}">{% trans "Mark all unseen notices seen" %}</a>
+			
+
+			<table border="0" cellspacing="0" cellpadding="0"> 
+				<tr class="bold hr">
+					<td style="padding-bottom:10px;">Notice type</td>
+					<td>Message</td>
+				</tr>
+
+                <tr>
+                    <td></td>
+                    <td></td>
+                </tr>
+
+		</table>
+	</div>
+</div>
+{% endblock outer_rightwing %}
+

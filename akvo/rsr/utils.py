@@ -201,15 +201,15 @@ def send_now(users, label, extra_context=None, on_site=True):
             notice_type=notice_type, on_site=on_site)
         if should_send(user, notice_type, "1") and user.email: # Email
             recipients.append(user.email)
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
+        #send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
         if should_send(user, notice_type, "2") and user.get_profile().phone_number: # SMS
             sms = render_to_string('notification/email_subject.txt', {
                 'message': messages['sms.txt'],
             }, context)
             # extra_context['gw_number'] holds a GatewayNumber object
             logger.debug("Sending SMS notification of type %s to %s." % (notice_type, user, ))
-            extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
-            #print "sending sms from %s, to %s: %s" % (extra_context['gw_number'], extra_context['phone_number'], sms)
+            #extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
+            print "sending sms from %s, to %s: %s" % (extra_context['gw_number'], extra_context['phone_number'], sms)
 
     # reset environment to original language
     activate(current_language)

@@ -51,7 +51,7 @@ from utils import (
 )
 from utils import (
     groups_from_user, rsr_image_path, rsr_send_mail_to_users, qs_column_sum,
-    setup_logging, who_am_i
+    setup_logging, who_am_i, send_now
 )
 from signals import (
     change_name_of_file_on_change, change_name_of_file_on_create, create_publishing_status,
@@ -972,7 +972,8 @@ class UserProfileManager(models.Manager):
                 pass
         else:
             raise("UserProfileManager error: No WorkflowActivity to handle incoming SMS")
-            
+
+    
 ROLE_SMS_UPDATER = u'SMS Updater'
 
 class UserProfile(models.Model):
@@ -1052,7 +1053,24 @@ class UserProfile(models.Model):
             user.groups.remove(group)
             user.save()
 
+    def my_projects(self):
+        return self.organisation.all_projects()
+        
+    def my_reporters(self):
+        return SmsReporter.objects.filter(userprofile=self)
+
     #mobile akvo
+    
+    def create_reporter(self, project):
+        """ Create a new SMSReporter object with a gateway number that is currently not in use
+        """
+        gw = Gateway.objects.get(name='42it')
+        numbers = GatewayNumber.objects.filter(gateway=gw).exclude(number__in=[r.gw_number.number for r in self.reporters.all()])
+        if numbers:
+            new_number = numbers[0]
+            reporter = SmsReporter.objects.create(userprofile=self, project=project, gw_number=new_number)
+        
+        
     def disable_reporting(self, reporter=None):
         """ Disable SMS reporting for one or all projects linked to a userprofile
         """
@@ -1232,20 +1250,22 @@ user_activated.connect(user_activated_callback)
 def create_rsr_profile(user, profile):
     return UserProfile.objects.create(user=user, organisation=Organisation.objects.get(pk=profile['org_id']))
 
-from utils import send_now
+
 class SmsReporter(models.Model):
     """
     Mapping between projects, gateway phone numbers and users phones
     """
-    userprofile = models.ForeignKey(UserProfile)
+    userprofile = models.ForeignKey(UserProfile, related_name='reporters')
     gw_number   = models.ForeignKey(GatewayNumber)
     project     = models.ForeignKey(Project, null=True, blank=True, )
- #enabled     = models.BooleanField(default=True)
-    #validation  = models.CharField(_('validation code'), max_length=20)
+    
+    #def __init__(self, *args, **kwargs):
+    #    from dbgp.client import brk
+    #    brk(host="localhost", port=9000)
     
     def reporting_cancelled(self, set_delete=False):
         profile = self.userprofile
-        self.delete = set_delete
+        #self.delete = set_delete
         extra_context = {
             'gw_number'     : self.gw_number,
             'phone_number'  : profile.phone_number,

@@ -21,7 +21,6 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.core.urlresolvers import reverse
 
-from django.forms import ModelForm
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext, Context, loader
@@ -45,10 +44,10 @@ from utils import setup_logging
 from models import (
     Organisation, Project, ProjectUpdate, ProjectComment, FundingPartner,
     MoSmsRaw, PHOTO_LOCATIONS, STATUSES, UPDATE_METHODS, UserProfile, MoMmsRaw,
-    MoMmsFile, PayPalInvoice
+    MoMmsFile, PayPalInvoice, SmsReporter
 )
 from forms import (
-    OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm
+    OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm, UpdateForm
 )
 
 logger = setup_logging()
@@ -535,24 +534,6 @@ def projectcomments(request, project_id):
     form        = CommentForm()
     return {'p': p, 'comments': comments, 'form': form, }
 
-class UpdateForm(ModelForm):
-
-    js_snippet = "return taCount(this,'myCounter')"
-    js_snippet = mark_safe(js_snippet)    
-    title           = forms.CharField(
-                        widget=forms.TextInput(
-                            attrs={'class':'input', 'maxlength':'50', 'size':'25', 'onKeyPress':'return taLimit(this)', 'onKeyUp':js_snippet}
-                      ))
-    text            = forms.CharField(required=False, widget=forms.Textarea(attrs={'class':'textarea', 'cols':'50'}))
-    #status          = forms.CharField(widget=forms.RadioSelect(choices=STATUSES, attrs={'class':'radio'}))
-    photo           = forms.ImageField(required=False, widget=forms.FileInput(attrs={'class':'input', 'size':'15', 'style':'height: 2em'}))
-    photo_location  = forms.CharField(required=False, widget=forms.RadioSelect(choices=PHOTO_LOCATIONS, attrs={'class':'radio'}))
-    photo_caption   = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'75',}))
-    photo_credit    = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'25',}))
-    
-    class Meta:
-        model = ProjectUpdate
-        exclude = ('time', 'project', 'user', )
 
 @login_required()
 def updateform(request, project_id):
@@ -581,6 +562,45 @@ def updateform(request, project_id):
     else:
         form = UpdateForm()
     return render_to_response('rsr/update_form.html', {'form': form, 'p': p, }, RequestContext(request))
+
+class MobileForm(forms.Form):
+    phone_number    = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'15',}))
+    project         = forms.ChoiceField(required=False, widget=forms.Select())
+
+    def __init__(self, *args, **kwargs):
+        profile = kwargs.pop('profile', None)
+        forms.Form.__init__(self, *args, **kwargs)
+        if profile:
+            self.fields['project'].choices = ((u'', u'---------'),) + tuple([(p.id, "%s - %s" % (unicode(p.pk), p.name)) for p in profile.my_projects()])
+            
+@login_required()
+def myakvo_mobile(request):
+    '''
+    '''
+    profile = request.user.get_profile()
+    reporters = profile.my_reporters()
+    form_data = {'phone_number': profile.phone_number}
+    if request.method == 'POST':
+        form = MobileForm(request.POST, request.FILES, profile=profile)
+        if form.is_valid():
+            project = Project.objects.get(pk=form.cleaned_data['project'])
+            profile.create_reporter(project)
+            reporters = profile.my_reporters()
+            return HttpResponseRedirect('./')
+    else:
+        form = MobileForm(form_data,profile=profile)
+    return render_to_response('myakvo/mobile.html', {'form': form, 'reporters': reporters, }, RequestContext(request))
+
+@login_required()
+def cancel_reporter(request, reporter_id):
+    '''
+    '''
+    profile = request.user.get_profile()
+    reporter = SmsReporter.objects.get(id=reporter_id)
+    profile.disable_reporting(reporter)
+    reporter.delete()
+    return HttpResponseRedirect(reverse('myakvo_mobile'))
+    
 
 def mms_update(request):
     '''
@@ -649,7 +669,7 @@ def sms_update(request):
             pass #TODO: logging!
     return HttpResponse("OK") #return OK under all conditions
 
-class CommentForm(ModelForm):
+class CommentForm(forms.ModelForm):
 
     comment     = forms.CharField(widget=forms.Textarea(attrs={
                                     'class':'textarea',

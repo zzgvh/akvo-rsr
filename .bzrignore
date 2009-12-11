@@ -95,3 +95,5 @@ akvo/datadir_bu
 akvo/testing.py
 akvo/rebuild_db.py
 datadir_old
+akvo/datadir_fixture
+akvo/datadir_fixture.zip
