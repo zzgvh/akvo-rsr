@@ -59,6 +59,7 @@ INSTALLED_APPS = (
     'paypal.standard.ipn',
     'sorl.thumbnail',
     'rosetta',
+    'notification',
 )
 
 #INTERNAL_IPS = (

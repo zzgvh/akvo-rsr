@@ -103,6 +103,12 @@ urlpatterns = patterns('',
         name='auth_password_reset_confirm'),
     (r'^rsr/accounts/update/complete/$', direct_to_template, {'template': 'registration/update_complete.html'} ),
     (r'^rsr/accounts/', include('registration.urls')),
+    
+    (r'^rsr/notices/', include('notification.urls')),
+    
+    #url(r'^rsr/myakvo/mobile/$', 'akvo.rsr.views.myakvo_mobile', name='myakvo_mobile'),
+    #url(r'^rsr/myakvo/mobile/cancel/(?P<reporter_id>\d+)/$', 'akvo.rsr.views.cancel_reporter', name='cancel_reporter'),
+
 	
 	# Widgets
     url(r'^rsr/partners-widget/$', 'akvo.rsr.views.partners_widget', name='rsr_partners_widget'),
