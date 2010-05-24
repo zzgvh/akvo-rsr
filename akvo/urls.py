@@ -106,6 +106,8 @@ urlpatterns = patterns('',
     
     (r'^rsr/notices/', include('notification.urls')),
     
+    (r'^rsr/gateway/', include('akvo.gateway.urls')),
+    
     #url(r'^rsr/myakvo/mobile/$', 'akvo.rsr.views.myakvo_mobile', name='myakvo_mobile'),
     #url(r'^rsr/myakvo/mobile/cancel/(?P<reporter_id>\d+)/$', 'akvo.rsr.views.cancel_reporter', name='cancel_reporter'),
 

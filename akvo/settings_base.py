@@ -60,6 +60,8 @@ INSTALLED_APPS = (
     'sorl.thumbnail',
     'rosetta',
     'notification',
+    'gateway',
+    'log',
 )
 
 #INTERNAL_IPS = (

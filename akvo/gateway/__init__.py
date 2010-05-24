@@ -7,11 +7,11 @@
 import logging
 
 from akvo.log.handler import DjangoHandler, setup_logging
-from akvo.rsr.utils import package_name
+from utils import package_name
 
 pn = package_name(__file__)
 
 #django_handler = DjangoHandler()
 #logging.getLogger(pn).addHandler(DjangoHandler())
 
-logger = setup_logging('akvo')
+logger = setup_logging('akvo.gateway')
