@@ -59,59 +59,80 @@ def create_model_instance(model, **kwargs):
         #    print "Created %s NoticeType" % label
 
     
-if "workflow" in settings.INSTALLED_APPS:
+#if "permissions" in settings.INSTALLED_APPS:
+#    from permissions.utils import register_role
+#    
+#    def create_permissions_objects(app, created_models, verbosity, **kwargs):
+#        #register_role('SMS Updater')
+#        print "Done creating permissions objects"
+#
+#    post_syncdb.connect(create_permissions_objects, sender=permissions)
+#else:
+#    print "Skipping creation of Permissions objects as permissions app not found"
+#    
+#if "workflows" in settings.INSTALLED_APPS:
+#
+#    def create_workflows_objects(app, created_models, verbosity, **kwargs):
+#        print "Done creating workflows objects"
+#
+#    post_syncdb.connect(create_workflows_objects, sender=workflows)
+#else:
+#    print "Skipping creation of Workflow objects as workflows app not found"
 
-    from workflow import models as workflow
 
-    def create_workflow_objects(app, created_models, verbosity, **kwargs):
-        try:
-            system_acct = User.objects.get(username='system')
-        except:
-            print "Can't create workflow objects without User 'system'."
-            return
-        # Role
-        role1_data = {
-            'handle':       {'name': 'SMS Updater'},
-            'description':  'Allows the user to create project updates via SMS.'
-        }
-        role1 = create_model_instance(workflow.Role, **role1_data)
-        # EventType
-        event_type1_data = {
-            'handle':       {'name': 'UserProfile change'},
-            'description':  "A change in a user's UserProfile has occured.",
-        }
-        event_type1 = create_model_instance(workflow.EventType, **event_type1_data)
-        event_type2_data = {
-            'handle':       {'name': 'Send email'},
-            'description':  "Send an email to a user.",
-        }
-        event_type2 = create_model_instance(workflow.EventType, **event_type2_data)
-        event_type3_data = {
-            'handle':       {'name': 'Send SMS'},
-            'description':  "Send an SMS to a user's mobile phone.",
-        }
-        event_type3 = create_model_instance(workflow.EventType, **event_type3_data)
-        # Workflow
-        workflow1_data = {
-            'handle':       {'name': 'SMS update'},
-            'slug':         'sms-update',
-            'description':  'Workflow for setting up a user to do project updates via SMS.',
-            'status':       workflow.Workflow.DEFINITION,
-            'created_by':   system_acct,
-        }
-        workflow1 = create_model_instance(workflow.Workflow, **workflow1_data)
-        # State
-        #state1_data = {
-        #    'handle':           {'name': 'Phone number added test'},
-        #    'description':      'A phone number is added to the UserProfile',
-        #    'is_start_state':   True,
-        #    'is_end_state':     False,
-        #    'workflow':         workflow1,
-        #    'roles':            role1,
-        #}
-        #state1 = create_model_instance(workflow.State, **state1_data)
-
-        
-    post_syncdb.connect(create_workflow_objects, sender=notification)
-else:
-    print "Skipping creation of Workflow objects as workflow app not found"
+#if "workflow" in settings.INSTALLED_APPS:
+#
+#    from workflow import models as workflow
+#
+#    def create_workflow_objects(app, created_models, verbosity, **kwargs):
+#        try:
+#            system_acct = User.objects.get(username='system')
+#        except:
+#            print "Can't create workflow objects without User 'system'."
+#            return
+#        # Role
+#        role1_data = {
+#            'handle':       {'name': 'SMS Updater'},
+#            'description':  'Allows the user to create project updates via SMS.'
+#        }
+#        role1 = create_model_instance(workflow.Role, **role1_data)
+#        # EventType
+#        event_type1_data = {
+#            'handle':       {'name': 'UserProfile change'},
+#            'description':  "A change in a user's UserProfile has occured.",
+#        }
+#        event_type1 = create_model_instance(workflow.EventType, **event_type1_data)
+#        event_type2_data = {
+#            'handle':       {'name': 'Send email'},
+#            'description':  "Send an email to a user.",
+#        }
+#        event_type2 = create_model_instance(workflow.EventType, **event_type2_data)
+#        event_type3_data = {
+#            'handle':       {'name': 'Send SMS'},
+#            'description':  "Send an SMS to a user's mobile phone.",
+#        }
+#        event_type3 = create_model_instance(workflow.EventType, **event_type3_data)
+#        # Workflow
+#        workflow1_data = {
+#            'handle':       {'name': 'SMS update'},
+#            'slug':         'sms-update',
+#            'description':  'Workflow for setting up a user to do project updates via SMS.',
+#            'status':       workflow.Workflow.DEFINITION,
+#            'created_by':   system_acct,
+#        }
+#        workflow1 = create_model_instance(workflow.Workflow, **workflow1_data)
+#        # State
+#        #state1_data = {
+#        #    'handle':           {'name': 'Phone number added test'},
+#        #    'description':      'A phone number is added to the UserProfile',
+#        #    'is_start_state':   True,
+#        #    'is_end_state':     False,
+#        #    'workflow':         workflow1,
+#        #    'roles':            role1,
+#        #}
+#        #state1 = create_model_instance(workflow.State, **state1_data)
+#
+#        
+#    post_syncdb.connect(create_workflow_objects, sender=notification)
+#else:
+#    print "Skipping creation of Workflow objects as workflow app not found"

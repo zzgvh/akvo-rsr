@@ -8,6 +8,7 @@ from django.conf import settings
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect
 
 from models import Gateway, MoSms
+from utils import who_am_i
 from akvo.gateway import logger
 
 def receive_sms(request, gw_name):
@@ -15,14 +16,14 @@ def receive_sms(request, gw_name):
     Handle a callback from a mobile message gateway
     '''
     # see if message already has been recieved for some reason, if so ignore
-    logger.debug("Entering: receive_sms()")
+    logger.debug("Entering: %s()" % who_am_i())
     try:
         gateway = Gateway.objects.get(name__iexact=gw_name)
         logger.debug("Found a gateway: %s" % gw_name)
-    except:
+    except Exception, e:
         # general bork...bail out
-        logger.exception("Exception trying to create a gateway instance. Locals:\n %s\n\n" % locals())
+        logger.exception("Exception trying to create a gateway instance. Error: %s Locals:\n %s\n\n" % (e.message, locals()))
         return HttpResponse("OK") #return OK under all conditions
     sms, created = MoSms.new_sms(request, gateway)
-    logger.debug("Exiting: receive_sms()")
+    logger.debug("Exiting: %s()" % who_am_i())
     return HttpResponse("OK") #return OK under all conditions

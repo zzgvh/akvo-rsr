@@ -1,0 +1,63 @@
+{% extends "rsr/index_base.html" %}
+
+{% comment %}
+Akvo RSR is covered by the GNU Affero General Public License, see more details in the license.txt file located at the root folder of the Akvo RSR module. 
+For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
+{% endcomment %}
+
+{% load i18n generic_content addparam rsr_tags thumbnail %}
+
+{% block title %}
+	{% trans 'MyAkvo - New phone number' %}
+{% endblock title %}
+
+{% block style %}
+	{{block.super}}
+	<link rel="stylesheet" type="text/css" href="{{MEDIA_URL}}css/march.css" media="screen" />
+	<meta http-equiv="pragma" content="no-cache"/>
+	<meta http-equiv="cache-control" content="no-cache"/>
+{% endblock style%}
+
+{% block breadcrumbs %}
+	{{block.super}} &raquo; {% trans 'MyAkvo - New phone number' %}
+{% endblock breadcrumbs %}
+
+{% block page_id %}
+<div id="page_workflow">
+{% endblock page_id %}
+
+{% block outer_leftwing %}
+
+<div id="outer_leftwing" style="margin-bottom:20px; width: 650px;">
+	<form method="post">
+	<div style="clear: left;width: 650px;" class="clearfix">
+	
+			<div class="boxhead">
+				<h1>{% trans 'Enter your mobile phone number' %}</h1>
+			</div> <!-- .boxhead -->
+            <div class="boxbody" style="padding-left:20px;">
+
+                Send updates from your mobile phone to projects in Akvo
+
+                <table border="0" cellspacing="0" cellpadding="0"> 
+                    <tr>
+                        <td class="lightx2" style="font-weight: bold; vertical-align: middle;">
+                            Mobile phone number
+                        </td>
+                        <td style="vertical-align: middle;">{{form.phone_number}}</td>
+                    </tr>
+                </table>                    
+
+				<input type="submit" value="{% trans 'Submit' %}">
+			</div>
+	</div>
+	</form>
+	
+</div> <!-- #outer_leftwing -->
+{% endblock outer_leftwing %}
+
+{% block outer_rightwing %}
+{% endblock outer_rightwing %}
+
+
+

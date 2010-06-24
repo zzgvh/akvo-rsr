@@ -5,6 +5,7 @@
 # For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
 
 from django.db import models
+from django.db.models.signals import post_save
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from datetime import datetime
@@ -13,6 +14,8 @@ import urllib
 import urllib2
 
 from utils import who_am_i
+from akvo.gateway import logger
+from akvo.rsr.signals import handle_incoming_sms
 
 #logger = setup_logging()
 
@@ -75,7 +78,8 @@ class GatewayNumber(models.Model):
         url_values = urllib.urlencode(data)
         gw = self.gateway
         full_url = 'http://%s%s?%s' % (gw.host_name, gw.send_path, url_values)
-        #data = urllib2.urlopen(full_url)
+        data = urllib2.urlopen(full_url)
+        print data
         print "send_sms calls: %s" % full_url
 
 
@@ -92,7 +96,7 @@ class MoSms(models.Model):
     """
     
     sender      = models.CharField(max_length=30, verbose_name=_(u'sender'),)
-    receiver    = models.CharField(max_length=30, verbose_name=_(u'receiver'),)
+    receiver    = models.CharField(max_length=30, verbose_name=_(u'receiver'),) #TODO: change to FK to GatewayNumber?
     message     = models.TextField(blank=True, verbose_name=_(u'message'),) #degenerate, but possible...
     timestamp   = models.CharField(max_length=50, verbose_name=_(u'timestamp'), blank=True,)
     msg_id      = models.CharField(max_length=100, verbose_name=_(u'message ID'), blank=True,)
@@ -109,19 +113,21 @@ class MoSms(models.Model):
         try:
             # if we find an mms already, do nuthin...
             sms, created = cls.objects.get(msg_id=request.GET.get(gateway.msg_id)), False
+            logger.debug("SMS with id %s already exists!" % msg_id)
         except:
-            try:
-                raw = {}
-                # loop over all field names and do lookup of the callback api name of
-                # the field to get the incoming value
-                for f in cls._meta.fields:
-                    value = request.GET.get(getattr(gateway, f.name, ''), False)
-                    if value:
-                        raw[f.name] = value
-                raw['saved_at'] = datetime.now()
-                sms, created = cls.objects.create(**raw), True
-            except:
-                logger.exception("Exception trying to create a MoSms instance. Locals:\n %s\n\n" % locals())
+            #try:
+            raw = {}
+            # loop over all field names and do lookup of the callback api name of
+            # the field to get the incoming value
+            for f in cls._meta.fields:
+                value = request.GET.get(getattr(gateway, f.name, ''), False)
+                if value:
+                    raw[f.name] = value
+            raw['saved_at'] = datetime.now()
+            sms, created = cls.objects.create(**raw), True
+            #except Exception, e:
+            #    logger.exception("Exception trying to create a MoSms instance. Error: %s Locals:\n %s\n\n" % (e.message, locals()))
+            #    return None, False
         logger.debug("Exiting: %s()" % who_am_i())
         return sms, created
 
@@ -180,10 +186,4 @@ class MoSms(models.Model):
 #    }
 #}
 
-
-
-
-
-
-
-
+post_save.connect(handle_incoming_sms, sender=MoSms)

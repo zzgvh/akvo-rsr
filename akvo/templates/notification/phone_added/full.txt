@@ -10,7 +10,7 @@ If the SMS didn't reach you for some reason you sent the validation code to:
 
 {{gw_number}}
 
-Then all you have to do is log in to Akvo and select the project you want to enable SMS updates for.
+Then all you have to do is log in to Akvo and select the project(s) you want to enable SMS updates for.
 
 
 The Akvo team

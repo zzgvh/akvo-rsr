@@ -37,15 +37,15 @@ PAYPAL_INVOICE_STATUS_VOID      = 2
 PAYPAL_INVOICE_STATUS_COMPLETE  = 3
 PAYPAL_INVOICE_STATUS_STALE     = 4
 
-
-#logger = setup_logging()
-
 def package_name(file=__file__):
     '''
     return the packae name of the current file
     '''
-    return os.path.split(os.path.realpath(file))[0].split(os.sep)[-1]
-    
+    return str(os.path.split(os.path.realpath(file))[0].split(os.sep)[-1])
+
+from log.handler import setup_logging
+logger = setup_logging(package_name())
+
 def who_am_i():
     "introspecting function returning the name of the function where who_am_i is called"
     return inspect.stack()[1][3]
@@ -143,6 +143,18 @@ def send_donation_confirmation_emails(invoice_id):
     msg.content_subtype = "html"
     msg.send()
 
+#if this gets updated, the create() method below needs to be as well...
+NOTICE_MEDIA = (
+    ("email", _("Email")),
+    ("sms", _("SMS")),
+)
+
+# how spam-sensitive is the medium
+NOTICE_MEDIA_DEFAULTS = {
+    "email": 2,
+    "sms": 2,
+}
+
 def send_now(users, label, extra_context=None, on_site=True, sender=None):
     """
     GvH: Modified version of notification.models.send_now
@@ -160,15 +172,14 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
     displayed on the site.
     """
     logger.debug("Entering: %s()" % who_am_i())
-
     if extra_context is None:
         extra_context = {}
-
+    
     notice_type = NoticeType.objects.get(label=label)
 
     protocol = getattr(settings, "DEFAULT_HTTP_PROTOCOL", "http")
     current_site = Site.objects.get_current()
-
+    
     notices_url = u"%s://%s%s" % (
         protocol,
         unicode(current_site),
@@ -180,7 +191,7 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
     formats = (
         'short.txt',
         'full.txt',
-        'sms-txt',
+        'sms.txt',
         'notice.html',
         'full.html',
     ) # TODO make formats configurable
@@ -222,108 +233,29 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
 
         notice = Notice.objects.create(recipient=user, message=messages['notice.html'],
             notice_type=notice_type, on_site=on_site, sender=sender)
-        if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
-            recipients.append(user.email)
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
-        
-        if should_send(user, notice_type, "2") and user.get_profile().phone_number: # SMS
-            sms = render_to_string('notification/email_subject.txt', {
-                'message': messages['sms.txt'],
-            }, context)
-            # extra_context['gw_number'] holds a GatewayNumber object
-            logger.debug("Sending SMS notification of type %s to %s." % (notice_type, user, ))
-            extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
-
-        
-
-    # reset environment to original language
-    activate(current_language)
-
-def send_now(users, label, extra_context=None, on_site=True):
-    """
-    Creates a new notice.
-
-    This is intended to be how other apps create new notices.
-
-    notification.send(user, 'friends_invite_sent', {
-        'spam': 'eggs',
-        'foo': 'bar',
-    )
-    
-    You can pass in on_site=False to prevent the notice emitted from being
-    displayed on the site.
-    """
-    logger.debug("Entering: %s()" % who_am_i())
-    if extra_context is None:
-        extra_context = {}
-    
-    notice_type = NoticeType.objects.get(label=label)
-
-    current_site = Site.objects.get_current()
-    notices_url = u"http://%s%s" % (
-        unicode(current_site),
-        reverse("notification_notices"),
-    )
-
-    current_language = get_language()
-
-    formats = (
-        'short.txt',
-        'full.txt',
-        'sms.txt',
-        'notice.html',
-        'full.html',
-    ) # TODO make formats configurable
-
-    for user in users:
-        recipients = []
-        # get user language for user from language store defined in
-        # NOTIFICATION_LANGUAGE_MODULE setting
-        try:
-            language = get_notification_language(user)
-        except LanguageStoreNotAvailable:
-            language = None
-
-        if language is not None:
-            # activate the user's language
-            activate(language)
-
-        # update context with user specific translations
-        context = Context({
-            "user": user,
-            "notice": ugettext(notice_type.display),
-            "notices_url": notices_url,
-            "current_site": current_site,
-        })
-        context.update(extra_context)
-
-        # get prerendered format messages
-        messages = get_formatted_messages(formats, label, context)
-
-        # Strip newlines from subject
-        subject = ''.join(render_to_string('notification/email_subject.txt', {
-            'message': messages['short.txt'],
-        }, context).splitlines())
-
-        body = render_to_string('notification/email_body.txt', {
-            'message': messages['full.txt'],
-        }, context)
-
-        notice = Notice.objects.create(user=user, message=messages['notice.html'],
-            notice_type=notice_type, on_site=on_site)
-        if should_send(user, notice_type, "1") and user.email: # Email
-            recipients.append(user.email)
-        #send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
-        if should_send(user, notice_type, "2") and user.get_profile().phone_number: # SMS
-            sms = render_to_string('notification/email_subject.txt', {
-                'message': messages['sms.txt'],
-            }, context)
-            # extra_context['gw_number'] holds a GatewayNumber object
-            logger.debug("Sending SMS notification of type %s to %s." % (notice_type, user, ))
-            #extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
-            print "sending sms from %s, to %s: %s" % (extra_context['gw_number'], extra_context['phone_number'], sms)
+        if user.is_active:
+            if should_send(user, notice_type, "email") and user.email: # Email
+                recipients.append(user.email)
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
+            if should_send(user, notice_type, "sms") and user.get_profile().phone_number: # SMS
+                sms = render_to_string('notification/email_subject.txt', {
+                    'message': messages['sms.txt'],
+                }, context)
+                #extra_context['gw_number'] holds a GatewayNumber object
+                logger.info("Sending SMS notification of type %s to %s." % (notice_type, user, ))
+                extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)
+                #print "sending sms from %s, to %s: %s" % (extra_context['gw_number'], extra_context['phone_number'], sms)
 
     # reset environment to original language
     activate(current_language)
     logger.debug("Exiting: %s()" % who_am_i())
 
+# workflow helpers
+
+from workflows.models import State
+from workflows.utils import get_state
+
+def state_equals(obj, state):
+    if type(state) != type([]):
+        state = [state] 
+    return get_state(obj) in State.objects.filter(name__in=state)

@@ -8,50 +8,30 @@
 
 import logging
 import datetime
-from akvo.log.models import Log
+from akvo.log.  models import Log
 
-if not hasattr(logging, "set_up_done"):
-    logging.set_up_done = False
+# TODO: fix duplicates
 
 def setup_logging(logger_name='', log_level=logging.DEBUG):    
     logger = logging.getLogger(logger_name)
 
-    if logging.set_up_done:
+    if not hasattr(logger, "set_up_done"):
+        logger.set_up_done = False
+        #print "set_up_done set to False for logger %s" % logger_name
+
+    if logger.set_up_done:
+        #print "exiting without adding handler for logger %s" % logger_name
         return logger
     
     logger.addHandler(DjangoHandler())
     logger.setLevel(log_level)
+    
+    #print "set_up_done: " + str(logger.set_up_done)
 
-    logging.set_up_done=True
+    logger.set_up_done=True
 
     return logger
 
-class Unique(logging.Filter):
-    """
-    From: http://code.activestate.com/recipes/412552-using-the-logging-module/
-    
-    Messages are allowed through just once.
-    The 'message' includes substitutions, but is not formatted by the 
-    handler. If it were, then practically all messages would be unique!
-    """
-    def __init__(self, name=""):
-        logging.Filter.__init__(self, name)
-        self.reset()
-    def reset(self):
-        """Act as if nothing has happened."""
-        self.__logged = {}
-    def filter(self, rec):
-        """logging.Filter.filter performs an extra filter on the name."""
-        return logging.Filter.filter(self, rec) and self.__is_first_time(rec)
-    def __is_first_time(self, rec):
-        """Emit a message only once."""
-        msg = rec.msg %(rec.args)
-        if msg in self.__logged:
-            self.__logged[msg] += 1
-            return False
-        else:
-            self.__logged[msg] = 1
-            return True
  
 class DjangoHandler(logging.Handler):
     '''Performs the handling of the log and inserts in the database'''

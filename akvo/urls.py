@@ -56,9 +56,9 @@ urlpatterns = patterns('',
     (r'^rsr/project/(?P<project_id>\d+)/comments/$', 'akvo.rsr.views.projectcomments', ),
     (r'^rsr/project/(?P<project_id>\d+)/details/$', 'akvo.rsr.views.projectdetails', ),
     (r'^rsr/project/(?P<project_id>\d+)/funding/$', 'akvo.rsr.views.projectfunding', ),
-	(r'^rsr/project/(?P<project_id>\d+)/get-a-widget/$', 'akvo.rsr.views.getwidget', ),
-	#(r'^rsr/project/(?P<project_id>\d+)/customise-widget$', 'akvo.rsr.views.customisewidget', ),
-    
+    (r'^rsr/project/(?P<project_id>\d+)/get-a-widget/$', 'akvo.rsr.views.getwidget', ),
+    #(r'^rsr/project/(?P<project_id>\d+)/customise-widget$', 'akvo.rsr.views.customisewidget', ),
+   
     url(r'^rsr/fundingbar/$', 'akvo.rsr.views.fundingbarimg', name='fundingbar'),    
 
     #(r'^rsr/project/(?P<project_id>\d+)/ajax_tab_goals$', 'akvo.rsr.views.ajax_tab_goals', ),
@@ -108,28 +108,28 @@ urlpatterns = patterns('',
     
     (r'^rsr/gateway/', include('akvo.gateway.urls')),
     
-    #url(r'^rsr/myakvo/mobile/$', 'akvo.rsr.views.myakvo_mobile', name='myakvo_mobile'),
-    #url(r'^rsr/myakvo/mobile/cancel/(?P<reporter_id>\d+)/$', 'akvo.rsr.views.cancel_reporter', name='cancel_reporter'),
+    url(r'^rsr/myakvo/mobile/$', 'akvo.rsr.views.myakvo_mobile', name='myakvo_mobile'),
+    url(r'^rsr/myakvo/mobile/number/$', 'akvo.rsr.views.myakvo_mobile_number', name='myakvo_mobile_number'),
+    url(r'^rsr/myakvo/mobile/cancel-reporter/(?P<reporter_id>\d+)/$', 'akvo.rsr.views.myakvo_cancel_reporter', name='myakvo_cancel_reporter'),
 
-	
-	# Widgets
+    # Widgets
     url(r'^rsr/partners-widget/$', 'akvo.rsr.views.partners_widget', name='rsr_partners_widget'),
     url(r'^rsr/widget/all-organisations/$', 'akvo.rsr.views.partners_widget', name='rsr_partners_widget'),
-	url(r'^rsr/widget/one-from-organisation/(?P<org_id>\d+)/$', 'akvo.rsr.views.select_project_widget', name='select_project_widget', ),
-	url(r'^rsr/widget/(?P<template>[\w-]+)/project/(?P<project_id>\d+)/$','akvo.rsr.views.project_widget', name='project_widget', ),
-	url(r'^rsr/widget/(?P<template>[\w-]+)/$','akvo.rsr.views.project_widget', name='project_widget_default', ),
-	
-	#url(r'^rsr/widget/list-from-organisation/(?P<org_id>)\d+)$', 'akvo.rsr.views.select_list_widget', name='select_list_widget', ),
-	#url(r'^rsr/widget/organisation/(?P<org_id>\d+)/(?P<template>[\w-]+)/$', 'akvo.rsr.views.project_list_widget', name='project_list_widget', ),
-	url(r'^rsr/widget/(?P<template>[\w-]+)/all/$', 'akvo.rsr.views.project_list_widget', name='project_list_widget', ),
-	url(r'^rsr/widget/(?P<template>[\w-]+)/organisation/(?P<org_id>\d+)/$', 'akvo.rsr.views.project_list_widget', name='project_list_widget', ),
-	
+    url(r'^rsr/widget/one-from-organisation/(?P<org_id>\d+)/$', 'akvo.rsr.views.select_project_widget', name='select_project_widget', ),
+    url(r'^rsr/widget/(?P<template>[\w-]+)/project/(?P<project_id>\d+)/$','akvo.rsr.views.project_widget', name='project_widget', ),
+    url(r'^rsr/widget/(?P<template>[\w-]+)/$','akvo.rsr.views.project_widget', name='project_widget_default', ),
+
+    #url(r'^rsr/widget/list-from-organisation/(?P<org_id>)\d+)$', 'akvo.rsr.views.select_list_widget', name='select_list_widget', ),
+    #url(r'^rsr/widget/organisation/(?P<org_id>\d+)/(?P<template>[\w-]+)/$', 'akvo.rsr.views.project_list_widget', name='project_list_widget', ),
+    url(r'^rsr/widget/(?P<template>[\w-]+)/all/$', 'akvo.rsr.views.project_list_widget', name='project_list_widget', ),
+    url(r'^rsr/widget/(?P<template>[\w-]+)/organisation/(?P<org_id>\d+)/$', 'akvo.rsr.views.project_list_widget', name='project_list_widget', ),
+    
     (r'^rsr/error/access_denied/$', direct_to_template, {'template': 'rsr/error_access_denied.html'}),
     
     url(r'^rsr/rss/(?P<url>.*)/$', 'django.contrib.syndication.views.feed', {'feed_dict': feeds}, name='akvo_feeds'),
 
-    (r'^rsr/mosms/$', 'akvo.rsr.views.sms_update', ),    
-    (r'^rsr/momms/$', 'akvo.rsr.views.mms_update', ),
+    #(r'^rsr/mosms/$', 'akvo.rsr.views.sms_update', ),    
+    #(r'^rsr/momms/$', 'akvo.rsr.views.mms_update', ),
     
     #url(r'^rsr/liveearth/$', 'akvo.rsr.views.liveearth', name='live_earth_landing_page',),    
     
@@ -169,7 +169,7 @@ if settings.DEBUG:
 
 if settings.DEBUG:
     urlpatterns += patterns('',
-		(r'^rsr/media/(?P<path>.*)$', 'django.views.static.serve', {'document_root': settings.MEDIA_ROOT}),
+        (r'^rsr/media/(?P<path>.*)$', 'django.views.static.serve', {'document_root': settings.MEDIA_ROOT}),
     )
 
 if 'rosetta' in settings.INSTALLED_APPS:

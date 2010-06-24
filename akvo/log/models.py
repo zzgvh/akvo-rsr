@@ -38,7 +38,7 @@ class Log(models.Model):
 
 class LogAdmin(admin.ModelAdmin):
    date_hierarchy = 'date'
-   list_display = ('level', 'levelName', 'date', 'messageSummary', 'fileSummary', 'lineno')
+   list_display = ('level', 'levelName', 'name', 'date', 'messageSummary', 'fileSummary', 'lineno')
    list_filter = ('level',)
    search_fields = ('message', 'file')
  

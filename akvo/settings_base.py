@@ -62,6 +62,8 @@ INSTALLED_APPS = (
     'notification',
     'gateway',
     'log',
+    'permissions',
+    'workflows',
 )
 
 #INTERNAL_IPS = (
