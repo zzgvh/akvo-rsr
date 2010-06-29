@@ -1014,11 +1014,10 @@ class UserProfileManager(models.Manager):
                 logger.debug("%s: state is %s." % (who_am_i(), profile.STATE_UPDATES_ENABLED))
                 # time to make an SMS update!
                 try:
-                    #reporter = SmsReporter.objects.get(profile=profile, gateway=Gateway.objects.get(name=profile.GATEWAY_42IT))
-                    reporter = self.reporters.get(gw_number=mo_sms.receiver)
+                    reporter = profile.reporters.get(gw_number=GatewayNumber.objects.get(number=mo_sms.receiver))
                     reporter.create_sms_update(mo_sms)
-                except:
-                    logger.error("Error in UserProfileManager.process_sms: can't get reporter instance. Locals:\n %s\n\n" % (locals()))
+                except Exception, e:
+                    logger.error("Error in UserProfileManager.process_sms: %s. Locals:\n %s\n\n" % (e.message, locals()))
             else:
                 logger.error('Error in UserProfileManager.process_sms: workflow in unknown state. Locals:\n %s\n\n' % (locals()))
         except Exception, e:

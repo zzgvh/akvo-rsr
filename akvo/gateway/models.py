@@ -109,25 +109,25 @@ class MoSms(models.Model):
         an incoming SMS
         """
         logger.debug("Entering: %s()" % who_am_i())
-        #request.encoding = 'iso-8859-1' #TODO: some GWs allow this to be set I think
+        request.encoding = 'iso-8859-1' #TODO: some GWs allow this to be set I think
         try:
             # if we find an mms already, do nuthin...
             sms, created = cls.objects.get(msg_id=request.GET.get(gateway.msg_id)), False
             logger.debug("SMS with id %s already exists!" % msg_id)
         except:
-            #try:
-            raw = {}
-            # loop over all field names and do lookup of the callback api name of
-            # the field to get the incoming value
-            for f in cls._meta.fields:
-                value = request.GET.get(getattr(gateway, f.name, ''), False)
-                if value:
-                    raw[f.name] = value
-            raw['saved_at'] = datetime.now()
-            sms, created = cls.objects.create(**raw), True
-            #except Exception, e:
-            #    logger.exception("Exception trying to create a MoSms instance. Error: %s Locals:\n %s\n\n" % (e.message, locals()))
-            #    return None, False
+            try:
+                raw = {}
+                # loop over all field names and do lookup of the callback api name of
+                # the field to get the incoming value
+                for f in cls._meta.fields:
+                    value = request.GET.get(getattr(gateway, f.name, ''), False)
+                    if value:
+                        raw[f.name] = value
+                raw['saved_at'] = datetime.now()
+                sms, created = cls.objects.create(**raw), True
+            except Exception, e:
+                logger.exception("Exception trying to create a MoSms instance. Error: %s Locals:\n %s\n\n" % (e.message, locals()))
+                return None, False
         logger.debug("Exiting: %s()" % who_am_i())
         return sms, created
 
