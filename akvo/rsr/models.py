@@ -1008,7 +1008,7 @@ class UserProfileManager(models.Manager):
             elif state_equals(profile, profile.STATE_PHONE_NUMBER_VALIDATED):
             #elif state == State.objects.get(name__iexact=profile.STATE_PHONE_NUMBER_VALIDATED):
                 # we shouldn't be here...phone ok, but no project selected :(
-                logger.error('Error in UserProfileManager.process_sms: workflow in state "%s" meaning phone is validated, but no project has been selected. Locals:\n %s\n\n' % (STATE_PHONE_NUMBER_VALIDATED, locals()))
+                logger.error('Error in UserProfileManager.process_sms: workflow in state "%s" meaning phone is validated, but no project has been selected. Locals:\n %s\n\n' % (profile.STATE_PHONE_NUMBER_VALIDATED, locals()))
             elif state_equals(profile, profile.STATE_UPDATES_ENABLED):
             #elif state == State.objects.get(name__iexact=profile.STATE_UPDATES_ENABLED):
                 logger.debug("%s: state is %s." % (who_am_i(), profile.STATE_UPDATES_ENABLED))
