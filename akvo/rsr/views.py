@@ -656,6 +656,14 @@ def projectupdates(request, project_id):
     updates     = Project.objects.get(id=project_id).project_updates.all().order_by('-time')
     can_add_update = p.connected_to_user(request.user)
     return {'p': p, 'updates': updates, 'can_add_update':can_add_update }
+
+def single_project_update(request, update_id):
+    '''
+    Redirect /rsr/update/4711/ to /rsr/project/NNN/updates/#4711
+    '''
+    project = get_object_or_404(ProjectUpdate, pk=update_id).project
+    path = reverse('project_updates', args=[project.pk])
+    return HttpResponseRedirect("%s#%s" % (path, update_id))
     
 @render_to('rsr/project_comments.html')
 def projectcomments(request, project_id):
