@@ -87,11 +87,11 @@ urlpatterns = patterns('',
     #(r'^rsr/signin/$', 'auth_views.login', {'template_name': 'rsr/sign_in.html'}),
     (r'^rsr/signout/$', 'akvo.rsr.views.signout', ),
     
+    #TODO: migrate the whole rsr/accounts url space to rsr/myakvo; this needs to take into account outstanding registrations at the time of migration
     (r'^rsr/accounts/register1/$', 'akvo.rsr.views.register1', ),
     (r'^rsr/accounts/register2/$', 'akvo.rsr.views.register2', ),
     url(r'^rsr/accounts/activate/(?P<activation_key>\w+)/$', 'akvo.rsr.views.activate', name='registration_activate'),
-    (r'^rsr/accounts/update/$', 'akvo.rsr.views.update_user_profile', ),
-    (r'^rsr/accounts/password/change/$', 'akvo.rsr.views.password_change', ),
+    url(r'^rsr/accounts/password/change/$', 'akvo.rsr.views.password_change', name='rsr_password_change'),
     url(r'^rsr/accounts/password/reset/$',
         auth_views.password_reset,
         {'password_reset_form': RSR_PasswordResetForm,
@@ -112,6 +112,7 @@ urlpatterns = patterns('',
     url(r'^rsr/myakvo/mobile/$', 'akvo.rsr.views.myakvo_mobile', name='myakvo_mobile'),
     url(r'^rsr/myakvo/mobile/number/$', 'akvo.rsr.views.myakvo_mobile_number', name='myakvo_mobile_number'),
     url(r'^rsr/myakvo/mobile/cancel-reporter/(?P<reporter_id>\d+)/$', 'akvo.rsr.views.myakvo_cancel_reporter', name='myakvo_cancel_reporter'),
+    url(r'^rsr/myakvo/$', 'akvo.rsr.views.update_user_profile', name="myakvo"),
 
     # Widgets
     url(r'^rsr/partners-widget/$', 'akvo.rsr.views.partners_widget', name='rsr_partners_widget'),

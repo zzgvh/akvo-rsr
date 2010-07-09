@@ -5,7 +5,7 @@ Akvo RSR is covered by the GNU Affero General Public License, see more details i
 For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
 {% endcomment %}
 
-{% load i18n generic_content addparam rsr_tags thumbnail %}
+{% load i18n generic_content addparam rsr_tags thumbnail pagination_tags %}
 
 {% block title %}
 	{% trans 'MyAkvo - Mobile' %}
@@ -28,9 +28,11 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
 
 {% block outer_leftwing %}
 
-<div id="outer_leftwing" style="margin-bottom:20px; width: 650px;">
+{% include "rsr/myakvo/navigation.html" %}
+
+<div id="outer_leftwing">
 	<form method="post">
-        <div style="clear: left;width: 650px;" class="clearfix">
+        <div style="clear: left;" class="clearfix">
         
                 <div class="boxhead">
                     <h1>{% trans 'Use Akvo RSR with text messaging' %}</h1>
@@ -78,64 +80,50 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
                                 </td>
                                 <td style="vertical-align: middle;">{{form.project}}</td>
                             </tr>
+                            <tr>
+                                <td>
+                                    <input type="submit" value="Add">
+                                </td>
+                            </tr>
                         {% endif %}
-            
                     </table>                    
     
-                    <input type="submit" value="Add">
+                    
                 </div>
         </div>
 	</form>
 	
 
-    <div class="boxbody">
-        <table border="0" cellspacing="0" cellpadding="0"> 
-            <tr class="bold hr">
-                <td>
-                    Workflow
-                </td>
-                <td>
-                    Project
-                </td>
-                <td>
-                    State
-                </td>
-                <td>
-                    Role(s)
-                </td>
-                <td>
-                    Action(s)
-                </td>
-            </tr>
-        </table>
+    <div>
+        <div class="boxhead">
+            <h1>{% trans "Your latest notices" %}</h1>
+        </div> <!-- .boxhead -->
+
+        <div class="boxbody" style="padding-left:20px;">
+            {% include "notification/notices_list.html" %}
+         <a style="padding-bottom: 20px;" href="{% url notification_notices %}">{% trans 'All notices' %}</a>
+        </div>
+        
     </div>
-</div> <!-- #outer_leftwing -->
+</div>
 {% endblock outer_leftwing %}
 
 {% block outer_rightwing %}
-<div id="outer_rightwing" style="width: 300px;">
-	<div class="boxhead">
-		<a class="actionbutton ab_grey" href=""><span>{% trans 'Admin' %}</span></a>						
-		<h1>{% trans 'Inbox' %}</h1>
-	</div> <!-- .boxhead -->
-	<div class="boxbody">
+<div id="outer_rightwing">
+    <div>
+        <div class="boxhead">
+            <h1>{% trans "Akvo mobile reporting" %}</h1>
+        </div> <!-- .boxhead -->
 
-			<a style="padding-left:20px;" href="{% url notification_mark_all_seen %}">{% trans "Mark all unseen notices seen" %}</a>
-			
-
-			<table border="0" cellspacing="0" cellpadding="0"> 
-				<tr class="bold hr">
-					<td style="padding-bottom:10px;">Notice type</td>
-					<td>Message</td>
-				</tr>
-
-                <tr>
-                    <td></td>
-                    <td></td>
-                </tr>
-
-		</table>
-	</div>
+        <div class="boxbody" style="padding-left:20px;">
+            <p>{% trans 'To enable updating from your mobile phone follow these steps:' %}</p>
+            <p>{% trans '1. Enter you mobile phone number. Your number will be listed on this page as needing validation.' %}</p>
+            <p>{% trans 'An email will be sent to you with a code. This email and others regarding SMS updating can be seen here too as Notices.' %}</p>
+            <p>{% trans 'An SMS will be sent to your phone. Reply to this phone number with the code from your email.' %}</p>
+            <p>{% trans '2. When your phone has been validated, return here to select a project to send updates to from your phone.' %}</p>
+            <p>{% trans 'You will be sent an SMS with the phone number you can send updates to for the selected project.' %}</p>
+        </div>
+        
+    </div>
 </div>
 {% endblock outer_rightwing %}
-

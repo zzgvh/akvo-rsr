@@ -64,6 +64,7 @@ INSTALLED_APPS = (
     'log',
     'permissions',
     'workflows',
+    'pagination',
 )
 
 #INTERNAL_IPS = (
@@ -103,12 +104,15 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.http.ConditionalGetMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'pagination.middleware.PaginationMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.middleware.doc.XViewMiddleware',
 )
 
 # PAUL
 # PAYPAL_RECEIVER_EMAIL = 'noreply@akvo.org'
+
+PAGINATION_DEFAULT_PAGINATION = 5
 
 ROOT_URLCONF = 'akvo.urls'
 

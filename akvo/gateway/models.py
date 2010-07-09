@@ -70,17 +70,20 @@ class GatewayNumber(models.Model):
         return self.number
 
     def send_sms(self, mt_number, message):
-        send_fields = GW_SENDING_FIELDS_42IT #TODO: generalize to handle any defined gateway
-        data = GW_SENDING_DATA_42IT #TODO: generalize to handle any defined gateway
-        gw_number = self.number
-        for field_name in ['gw_number', 'mt_number', 'message',]:
-            data[send_fields[field_name]] = locals()[field_name]
-        url_values = urllib.urlencode(data)
-        gw = self.gateway
-        full_url = 'http://%s%s?%s' % (gw.host_name, gw.send_path, url_values)
-        data = urllib2.urlopen(full_url)
-        print data
-        print "send_sms calls: %s" % full_url
+        logger.debug("Entering: %s()" % who_am_i())
+        try:
+            send_fields = GW_SENDING_FIELDS_42IT #TODO: generalize to handle any defined gateway
+            data = GW_SENDING_DATA_42IT #TODO: generalize to handle any defined gateway
+            gw_number = self.number
+            for field_name in ['gw_number', 'mt_number', 'message',]:
+                data[send_fields[field_name]] = locals()[field_name]
+            url_values = urllib.urlencode(dict([k, v.encode('utf-8')] for k, v in data.items()))
+            gw = self.gateway
+            full_url = 'http://%s%s?%s' % (gw.host_name, gw.send_path, url_values)
+            data = urllib2.urlopen(full_url)
+        except Exception, e:
+            logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))            
+        logger.debug("Exiting: %s(). Called URL: %s" % (who_am_i(), data))
 
 
 class MoSms(models.Model):

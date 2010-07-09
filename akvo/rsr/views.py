@@ -52,6 +52,7 @@ from decimal import Decimal
 
 from mollie.ideal.utils import query_mollie, get_mollie_fee
 from paypal.standard.forms import PayPalPaymentsForm
+from notification.models import Notice
 
 REGISTRATION_RECEIVERS = ['gabriel@akvo.org', 'thomas@akvo.org', 'beth@akvo.org']
 
@@ -780,15 +781,18 @@ def myakvo_mobile_number(request):
             return HttpResponseRedirect(reverse('myakvo_mobile'))
     else:
         form = MobileNumberForm({'phone_number': profile.phone_number},)
-    return render_to_response('myakvo/mobile_number.html', {'form': form, }, RequestContext(request))
+    return render_to_response('rsr/myakvo/mobile_number.html', {'form': form, }, RequestContext(request))
 
 @login_required()
 def myakvo_mobile(request):
     '''
+    Handle the selection of projects for SMS reporting
     '''
     profile = request.user.get_profile()
     reporters = profile.my_reporters()
     form_data = {'phone_number': profile.phone_number}
+    notices = Notice.objects.notices_for(request.user, on_site=True)
+    
     if request.method == 'POST':
         form = MobileProjectForm(request.POST, request.FILES, profile=profile)
         if form.is_valid():
@@ -799,11 +803,12 @@ def myakvo_mobile(request):
     else:
         form = MobileProjectForm(form_data,profile=profile)
     return render_to_response(
-        'myakvo/mobile.html', {
+        'rsr/myakvo/mobile.html', {
             'profile': profile,
             'form': form,
             'reporters': reporters,
-            'sms_updating_enabled': state_equals(profile, [profile.STATE_UPDATES_ENABLED, profile.STATE_PHONE_NUMBER_VALIDATED])
+            'sms_updating_enabled': state_equals(profile, [profile.STATE_UPDATES_ENABLED, profile.STATE_PHONE_NUMBER_VALIDATED]),
+            'notices': notices,
         }, RequestContext(request))
 
 @login_required()

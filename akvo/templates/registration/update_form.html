@@ -23,7 +23,7 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
 
 {% block content %}
 
-
+    {% include "rsr/myakvo/navigation.html" %}
     <div class="boxbody">
         <div class="clearfix">
 
@@ -42,9 +42,11 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
             <p>{% trans 'Your user name is' %}: {{request.user}}</p>
             
             <p>{% trans 'Your organisation is' %}: {{request.user.get_profile.organisation_name}}
-            
-            <p>{% trans 'Change your password <a href="/rsr/accounts/password/change/" class="c5">here</a>.' %}</p>
+            {% url rsr_password_change as url_rsr_password_change %}
+            <p>{% blocktrans %}Change your password <a href="{{url_rsr_password_change}}" class="c5">here</a>.{% endblocktrans %}</p>
 
+            {% url myakvo_mobile as url_myakvo_mobile %}
+            <p>{% blocktrans %}Sign up for SMS reporting <a href="{{ url_myakvo_mobile }}" class="c5">here</a>.{% endblocktrans %}</p>
         <hr>
             
         
