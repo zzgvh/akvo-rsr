@@ -1436,7 +1436,8 @@ class SmsReporter(models.Model):
         profile = self.userprofile
         extra_context = {
             'gw_number'     : self.gw_number,
-            'phone_number'  : profile.phone_number
+            'phone_number'  : profile.phone_number,
+            'domain'        : Site.objects.get_current().domain,
         }
         send_now([profile.user], 'phone_confirmed', extra_context=extra_context, on_site=True)
 
