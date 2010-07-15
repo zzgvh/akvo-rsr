@@ -825,7 +825,7 @@ def myakvo_cancel_reporter(request, reporter_id):
 #    Create a project update from incoming MMS
 #    Returns a simple "OK" to the gateway
 #    '''
-#    # see if message already has been recieved for some reason, if so ignore
+#    # see if message already has been received for some reason, if so ignore
 #    try:
 #        # if we find an mms already, do nuthin...
 #        mms = MoMmsRaw.objects.get(mmsid__exact=request.GET.get('mmsid'))

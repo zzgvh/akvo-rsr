@@ -4,6 +4,7 @@
 # See more details in the license.txt file located at the root folder of the Akvo RSR module. 
 # For additional details on the GNU license please see < http://www.gnu.org/licenses/agpl.html >.
 
+from django.conf import settings
 from django.db import models
 from django.db.models.signals import post_save
 from django.utils.translation import ugettext, ugettext_lazy as _
@@ -80,7 +81,10 @@ class GatewayNumber(models.Model):
             url_values = urllib.urlencode(dict([k, v.encode('utf-8')] for k, v in data.items()))
             gw = self.gateway
             full_url = 'http://%s%s?%s' % (gw.host_name, gw.send_path, url_values)
-            data = urllib2.urlopen(full_url)
+            if getattr(settings, 'SMS_DEBUG', False):
+                print "send_sms URL call: %s" % full_url    
+            else:
+                data = urllib2.urlopen(full_url)
         except Exception, e:
             logger.exception('%s Locals:\n %s\n\n' % (e.message, locals(), ))            
         logger.debug("Exiting: %s(). Called URL: %s" % (who_am_i(), data))

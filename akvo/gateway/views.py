@@ -15,7 +15,7 @@ def receive_sms(request, gw_name):
     '''
     Handle a callback from a mobile message gateway
     '''
-    # see if message already has been recieved for some reason, if so ignore
+    # see if message already has been received for some reason, if so ignore
     logger.debug("Entering: %s()" % who_am_i())
     try:
         gateway = Gateway.objects.get(name__iexact=gw_name)

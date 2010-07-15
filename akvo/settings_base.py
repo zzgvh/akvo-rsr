@@ -123,6 +123,8 @@ SEND_BROKEN_LINK_EMAILS = True
 
 SITE_ID = 1
 
+SMS_DEBUG = True
+
 TEMPLATE_CONTEXT_PROCESSORS = (
     "django.core.context_processors.auth",
     "django.core.context_processors.debug",

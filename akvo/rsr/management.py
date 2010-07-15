@@ -33,6 +33,11 @@ if "notification" in settings.INSTALLED_APPS:
             _("Phone disabled"),
             _("SMS-updates from your mobile phone are no longer accepted")
         )
+        notification.create_notice_type(
+            "update_received",
+            _("Update received"),
+            _("Akvo has received an update from your phone")
+        )
  
     post_syncdb.connect(create_notice_types, sender=notification)
 else:

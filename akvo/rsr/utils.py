@@ -238,9 +238,10 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
                 recipients.append(user.email)
             send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
             if should_send(user, notice_type, "sms") and user.get_profile().phone_number: # SMS
-                sms = render_to_string('notification/email_subject.txt', {
+                # strip newlines
+                sms = ''.join(render_to_string('notification/email_subject.txt', {
                     'message': messages['sms.txt'],
-                }, context)
+                }, context).splitlines())
                 #extra_context['gw_number'] holds a GatewayNumber object
                 logger.info("Sending SMS notification of type %s to %s." % (notice_type, user, ))
                 extra_context['gw_number'].send_sms(extra_context['phone_number'], sms)

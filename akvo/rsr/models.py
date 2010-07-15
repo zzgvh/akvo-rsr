@@ -21,8 +21,8 @@ from django.contrib import admin
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import Group, User
 from django.contrib.sites.models import Site
-#from django.core import validators
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.urlresolvers import reverse
 from django.template import loader, Context
 from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
@@ -1391,6 +1391,7 @@ class SmsReporter(models.Model):
         try:
             update = ProjectUpdate.objects.create(**update_data)
             logger.info("Created new project update from sms. ProjectUpdate.id: %d" % update.pk)
+            self.update_received(update)
             logger.debug("Exiting: %s()" % who_am_i())
             return update
         except Exception, e:    
@@ -1398,6 +1399,17 @@ class SmsReporter(models.Model):
             logger.debug("Exiting: %s()" % who_am_i())
             return False
 
+    def update_received(self, update):
+        profile = self.userprofile
+        extra_context = {
+            'gw_number'     : self.gw_number,
+            'phone_number'  : profile.phone_number,
+            'project'       : self.project,
+            'update'        : update,
+            'domain'        : Site.objects.get_current().domain,
+        }
+        send_now([profile.user], 'update_received', extra_context=extra_context, on_site=True)
+        
     def reporting_cancelled(self, set_delete=False):
         profile = self.userprofile
         #self.delete = set_delete
@@ -1543,6 +1555,8 @@ class ProjectUpdate(models.Model):
     get_is_featured.boolean = True #make pretty icons in the admin list view
     get_is_featured.short_description = 'update is featured'
 
+    def get_absolute_url(self):
+        return "%s#%s" % (reverse('project_updates', args=[self.project.pk]), self.id)
 
 class ProjectComment(models.Model):
     project         = models.ForeignKey(Project, verbose_name=_('project'))
