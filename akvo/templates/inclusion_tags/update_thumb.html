@@ -4,6 +4,7 @@
 
 {% if update_image %}
     <img src="{{update_image}}" alt="{{update.photo_caption}}" style="margin: 10px 10px 5px 20px" />
+    <p style="float: right; display:none; margin-bottom: 10px; cursor: pointer;" id="show_{{update.pk}}">Show map</p>
     <p class="small lightx1">
         {% if update.photo_caption %}
             {{update.photo_caption}}
@@ -12,5 +13,29 @@
             {% trans 'Photo credit' %}: {{update.photo_credit}}
         {% endif %}
     </p>
+    
+    {% if wide_map %}
+    <div id="map_{{update.pk}}" style="display: none; margin: 10px 10px 5px 20px; width: 668px; height: 668px; background: red;"></div>
+    {% else %}
+    <div id="map_{{update.pk}}" style="display: none; margin: 10px 10px 5px 20px; width: 300px; height: 300px; background: red;"></div>
+    
+    {% endif %}
+
+    <script type="text/javascript">
+
+    
+    lat  = {{update.exif_to_google_coords.0}};
+    long = {{update.exif_to_google_coords.1}};
+    if (lat || long) {
+        $('#show_{{update.pk}}').show();
+    }
+    
+    $('#show_{{update.pk}}').click(function() {
+        document.getElementById("map_{{update.pk}}").style.display = '';
+        var gMap = makeMap("map_{{update.pk}}", {{update.exif_to_google_coords.0}}, {{update.exif_to_google_coords.1}})
+    });
+
+    </script>    
+
 {% endif %}
 

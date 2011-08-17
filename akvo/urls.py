@@ -51,13 +51,15 @@ urlpatterns = patterns('',
         'akvo.rsr.views.projectmain', 
         name='project_main'),
     (r'^rsr/project/(?P<project_id>\d+)/update$', 'akvo.rsr.views.updateform', ),
+    #(r'^rsr/project/(?P<project_id>\d+)/geo_update$', 'akvo.rsr.views.geo_updateform', ),
+    (r'^rsr/geo_update/$', 'akvo.rsr.views.geo_updateform', ),
     (r'^rsr/project/(?P<project_id>\d+)/comment$', 'akvo.rsr.views.commentform', ),
     url(r'^rsr/project/(?P<project_id>\d+)/updates$', 'akvo.rsr.views.projectupdates', name='project_updates'),
     (r'^rsr/project/(?P<project_id>\d+)/comments$', 'akvo.rsr.views.projectcomments', ),
     (r'^rsr/project/(?P<project_id>\d+)/details$', 'akvo.rsr.views.projectdetails', ),
     (r'^rsr/project/(?P<project_id>\d+)/funding$', 'akvo.rsr.views.projectfunding', ),
-	(r'^rsr/project/(?P<project_id>\d+)/get-a-widget$', 'akvo.rsr.views.getwidget', ),
-	#(r'^rsr/project/(?P<project_id>\d+)/customise-widget$', 'akvo.rsr.views.customisewidget', ),
+    (r'^rsr/project/(?P<project_id>\d+)/get-a-widget$', 'akvo.rsr.views.getwidget', ),
+
     
     url(r'^rsr/fundingbar/$', 'akvo.rsr.views.fundingbarimg', name='fundingbar'),    
 

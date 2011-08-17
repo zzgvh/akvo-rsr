@@ -145,7 +145,7 @@ def map_thumb(context, object, width, height, style=''):
     }
 
 @register.inclusion_tag('inclusion_tags/update_thumb.html', takes_context=True)
-def update_thumb(context, update, width, height):
+def update_thumb(context, update, width, height, wide_map=False):
     '''
     '''
     return {
@@ -154,5 +154,6 @@ def update_thumb(context, update, width, height):
         'width'     : width,
         'height'    : height,
         'wxh'       : '%sx%s' % (width, height,),
+        'wide_map'  : wide_map,
     }
  

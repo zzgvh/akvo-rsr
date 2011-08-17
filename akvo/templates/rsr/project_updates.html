@@ -9,6 +9,50 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
 
 {% block title %}{{block.super}} - {% trans 'All project updates' %}{% endblock title %}
 
+{% block script %}
+{#<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script> #}
+<script type="text/javascript" src="{{MEDIA_URL}}js/jquery-1.3.2.min.js"></script>
+
+
+<script src="{{MEDIA_URL}}js/ui.tabs.pack.js" type="text/javascript"></script>
+
+<script src="http://maps.google.com/maps?file=api&amp;v=2&amp;key={{google_maps_api_key}}"
+        type="text/javascript"></script>
+   
+<script type="text/javascript">
+
+	$(function(){
+    	$('#container-1 > ul').tabs();
+	});
+	
+	$(document).ready(function(){
+    	$(".btn-slide").click(function(){
+    		$("#panel").slideToggle("slow");
+    		$(this).toggleClass("active"); return false;
+    	});
+	});
+    
+    var oMarker;
+
+    function makeMap(mapId, lat, long) {    
+        var gMapDiv = document.getElementById(mapId);
+        var googMap = new GMap2(gMapDiv);
+        googMap.addControl(new GLargeMapControl3D());
+        googMap.addControl(new GMapTypeControl());
+        googMap.setCenter(new GLatLng(lat, long), 13);
+    
+        //if (oMarker)
+        //oMap.removeOverlay(oMarker)
+    
+        // add a new marker
+        oMarker = new GMarker(new GLatLng(lat, long));
+        googMap.addOverlay(oMarker);
+        return googMap;
+    };
+
+</script>
+{% endblock script %}
+
 {% block breadcrumbs %}
 {{block.super}} &raquo; <a href="{% url akvo.rsr.views.projectlist %}">{% trans 'Project listing' %}</a> &raquo; <a href="{% url akvo.rsr.views.projectmain p.id %}">{{p.name}}</a> &raquo; {% trans 'All project updates' %}
 {% endblock breadcrumbs %}
@@ -47,15 +91,15 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
             <!--<p><span class="lightx1">Status:</span> {{u.show_status}}</p>-->
             <br />
             {% ifequal u.photo_location 'B' %}
-                {% update_thumb u 668 501 %}
+                {% update_thumb u 668 501 'True' %}
             {% endifequal %}
             {% if u.text %}
                 <p>{{u.text}}</p>
             {% endif %}
             {% ifequal u.photo_location 'E' %}
-                {% update_thumb u 668 501 %}
+                {% update_thumb u 668 501 'True' %}
             {% endifequal %}
-            <p style="text-align:right"><a href="{% url akvo.rsr.views.projectupdates p.id %}#{{u.id}}">{% trans 'Permalink' %}</a></p>
+            <p style="text-align:right; clear: both;"><a href="{% url akvo.rsr.views.projectupdates p.id %}#{{u.id}}">{% trans 'Permalink' %}</a></p>
         {% endfor %}
 
 	</div> <!-- #project_updates & .boxbody -->

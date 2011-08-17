@@ -939,6 +939,7 @@ UPDATE_METHODS = (
     ('W', _('web')),
     ('E', _('e-mail')),
     ('S', _('SMS')),
+    ('P', _('Akvo Phone')),
 )
 #UPDATE_METHODS_DICT = dict(UPDATE_METHODS) #used to output UPDATE_METHODS text
 
@@ -1151,6 +1152,28 @@ class MoSmsRaw(models.Model):
     saved_at    = models.DateTimeField(_('saved at'))
     incsmsid    = models.CharField(_('incoming sms id'), max_length=100)
 
+
+def tagbit_to_float(bit):
+    bit = str(bit)
+    bit = bit.split('/')
+    if len(bit) == 2: #fraction
+        return float(bit[0])/float(bit[1])
+    else:
+        return float(bit[0])
+
+def exif_coord_to_decimal(pos_tag, ref_tag):
+    '''
+    takes an exif GPS GPSLatitude or GPS GPSLongitude tag and converts into a decimal coordinate
+    '''
+    pos_tag = pos_tag.values
+    degrees = tagbit_to_float(pos_tag[0])
+    minutes = tagbit_to_float(pos_tag[1])
+    seconds = tagbit_to_float(pos_tag[2])
+    decimal = degrees + minutes/60.0 + seconds/3600.0
+    return decimal * (1 if ref_tag in ('N', 'E') else -1)
+    
+import EXIF
+    
 class ProjectUpdate(models.Model):
     def image_path(instance, file_name):
         "Create a path like 'db/project/<update.project.id>/update/<update.id>/image_name.ext'"
@@ -1183,6 +1206,23 @@ class ProjectUpdate(models.Model):
         except:
             return ''
     img.allow_tags = True
+    
+    
+    def exif_to_google_coords(self):
+        try:
+            f = self.photo.file
+            f.open()
+            tags = EXIF.process_file(f, details=False)
+            f.close()
+            lat  = tags['GPS GPSLatitude']
+            ns = str(tags['GPS GPSLatitudeRef'])
+            goog_lat = exif_coord_to_decimal(lat, ns)
+            long = tags['GPS GPSLongitude']
+            ew = str(tags['GPS GPSLongitudeRef'])
+            goog_long = exif_coord_to_decimal(long, ew)
+            return goog_lat, goog_long
+        except:
+            return 0.0, 0.0
 
 class ProjectComment(models.Model):
     project         = models.ForeignKey(Project, verbose_name=_('project'))

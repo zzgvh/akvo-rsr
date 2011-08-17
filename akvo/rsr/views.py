@@ -6,7 +6,10 @@
 
 from akvo.rsr.models import Organisation, Project, ProjectUpdate, ProjectComment, FundingPartner, MoSmsRaw, PHOTO_LOCATIONS, STATUSES, UPDATE_METHODS
 from akvo.rsr.models import UserProfile, MoMmsRaw, MoMmsFile, Invoice
-from akvo.rsr.forms import InvoiceForm, OrganisationForm, RSR_RegistrationFormUniqueEmail, RSR_ProfileUpdateForm# , RSR_RegistrationForm, RSR_PasswordChangeForm, RSR_AuthenticationForm, RSR_RegistrationProfile
+from akvo.rsr.forms import (
+    InvoiceForm, OrganisationForm, RSR_RegistrationFormUniqueEmail,
+    RSR_ProfileUpdateForm, UpdateForm, GeoUpdateForm
+)
 from akvo.rsr.decorators import fetch_project
 
 from django import forms
@@ -566,7 +569,12 @@ def projectupdates(request, project_id):
     p           = get_object_or_404(Project, pk=project_id)
     updates     = Project.objects.get(id=project_id).project_updates.all().order_by('-time')
     can_add_update = p.connected_to_user(request.user)
-    return {'p': p, 'updates': updates, 'can_add_update':can_add_update }
+    return {
+        'p': p,
+        'updates': updates,
+        'can_add_update':can_add_update,
+        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
+    }
     
 @render_to('rsr/project_comments.html')
 def projectcomments(request, project_id):
@@ -581,24 +589,6 @@ def projectcomments(request, project_id):
     form        = CommentForm()
     return {'p': p, 'comments': comments, 'form': form, }
 
-class UpdateForm(ModelForm):
-
-    js_snippet = "return taCount(this,'myCounter')"
-    js_snippet = mark_safe(js_snippet)    
-    title           = forms.CharField(
-                        widget=forms.TextInput(
-                            attrs={'class':'input', 'maxlength':'50', 'size':'25', 'onKeyPress':'return taLimit(this)', 'onKeyUp':js_snippet}
-                      ))
-    text            = forms.CharField(required=False, widget=forms.Textarea(attrs={'class':'textarea', 'cols':'50'}))
-    #status          = forms.CharField(widget=forms.RadioSelect(choices=STATUSES, attrs={'class':'radio'}))
-    photo           = forms.ImageField(required=False, widget=forms.FileInput(attrs={'class':'input', 'size':'15', 'style':'height: 2em'}))
-    photo_location  = forms.CharField(required=False, widget=forms.RadioSelect(choices=PHOTO_LOCATIONS, attrs={'class':'radio'}))
-    photo_caption   = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'75',}))
-    photo_credit    = forms.CharField(required=False, widget=forms.TextInput(attrs={'class':'input', 'size':'25', 'maxlength':'25',}))
-    
-    class Meta:
-        model = ProjectUpdate
-        exclude = ('time', 'project', 'user', )
 
 @login_required()
 def updateform(request, project_id):
@@ -627,6 +617,33 @@ def updateform(request, project_id):
     else:
         form = UpdateForm()
     return render_to_response('rsr/update_form.html', {'form': form, 'p': p, }, RequestContext(request))
+
+class HttpResponseNoContent(HttpResponse):
+    status_code = 204    
+
+def geo_updateform(request, project_id=settings.GEO_UPDATE_PROJECT_ID):
+    '''
+    Form for creating a project update from geo tagged image
+    Context:
+    p: project
+    form: the update form
+    '''
+    p = get_object_or_404(Project, pk=project_id)
+    
+    # TODO: some identification method, maybe this is part of the image meta data?
+    
+    if request.method == 'POST':
+
+        form = GeoUpdateForm(request.POST, request.FILES, )
+        if form.is_valid():
+            update = form.save(commit=False)
+            update.project = p
+            update.title = "Geo-update!"
+            update.time = datetime.now()
+            update.user = User.objects.get(pk=settings.GEO_UPDATE_USER_ID)
+            update.update_method = 'P'
+            update.save()
+    return HttpResponseNoContent()
 
 def mms_update(request):
     '''
@@ -766,7 +783,14 @@ def projectmain(request, project_id):
     form        = CommentForm()
     can_add_update = p.connected_to_user(request.user)
         
-    return {'p': p, 'updates': updates, 'comments': comments, 'form': form, 'can_add_update': can_add_update }
+    return {
+        'p': p,
+        'updates': updates,
+        'comments': comments,
+        'form': form,
+        'can_add_update': can_add_update,
+        'google_maps_api_key': settings.GOOGLE_MAPS_API_KEY,
+    }
 
 @render_to('rsr/project_details.html')    
 def projectdetails(request, project_id):
@@ -860,9 +884,6 @@ def templatedev(request, template_name):
     return render_to_response('dev/%s.html' % template_name,
         {'dev': dev, 'p': p, 'updates': updates, 'comments': comments, 'projects': projects, 'stats': stats, 'orgs': orgs, 'o': o, 'org_projects': org_projects, 'org_partners': org_partners, 'org_stats': org_stats, 'grid_projects': grid_projects, }, context_instance=RequestContext(request))
 
-class HttpResponseNoContent(HttpResponse):
-    status_code = 204
-    
 from django.db.models import Max
 
 def select_project_widget(request, org_id, template=''):

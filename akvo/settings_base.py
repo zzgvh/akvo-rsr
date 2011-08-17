@@ -36,6 +36,8 @@ CACHE_MIDDLEWARE_SECONDS = 300
 
 #DEFAULT_FROM_EMAIL = 'noreply@akvo.og'
 
+GOOGLE_MAPS_API_KEY = 'ABQIAAAAB24W36TB1DmKkGMC_QCP3hQththnBZ9YQ6Qu_YUS8-jbjg9b5xS-HreiclBwuTu6bq_z3ogABUxasA'
+
 INSTALLED_APPS = (
     'django.contrib.auth',
     'django.contrib.contenttypes',

@@ -13,6 +13,10 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
 
 
 <script src="{{MEDIA_URL}}js/ui.tabs.pack.js" type="text/javascript"></script>
+
+<script src="http://maps.google.com/maps?file=api&amp;v=2&amp;key={{google_maps_api_key}}"
+        type="text/javascript"></script>
+   
 <script type="text/javascript">
 
 	$(function(){
@@ -25,6 +29,24 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
     		$(this).toggleClass("active"); return false;
     	});
 	});
+    
+    var oMarker;
+
+    function makeMap(mapId, lat, long) {    
+        var gMapDiv = document.getElementById(mapId);
+        var googMap = new GMap2(gMapDiv);
+        googMap.addControl(new GLargeMapControl3D());
+        googMap.addControl(new GMapTypeControl());
+        googMap.setCenter(new GLatLng(lat, long), 13);
+    
+        //if (oMarker)
+        //oMap.removeOverlay(oMarker)
+    
+        // add a new marker
+        oMarker = new GMarker(new GLatLng(lat, long));
+        googMap.addOverlay(oMarker);
+        return googMap;
+    };
 
 </script>
 {% endblock script %}
@@ -224,7 +246,6 @@ For additional details on the GNU license please see < http://www.gnu.org/licens
 				Only if user are logged in and have the right privileges should the add update button be
 				visible.
 			{% endcomment %}
-			
 			{% if can_add_update %}
 			<a class="actionbutton ab_grey" href="{% url akvo.rsr.views.updateform p.id %}" onclick="this.blur();"><span>{% trans 'Add update' %}</span></a>
 			{% endif %}
